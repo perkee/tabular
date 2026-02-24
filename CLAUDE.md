@@ -1,5 +1,9 @@
 # Tabular - Development Best Practices
 
+## Git Workflow
+- Implement features on feature branches, not directly on main
+- Merge to main via pull requests using `gh pr create`
+
 ## Custom Types Over Primitives
 - Use custom types (tagged unions) wherever possible
 - Strings, integers, and booleans should only be used for things that cannot be represented otherwise
