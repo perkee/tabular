@@ -4,9 +4,11 @@
     "build": "lamdera make src/Frontend.elm --output=/dev/null",
     "test": "elm-test --compiler lamdera",
     "review": "elm-review",
-    "check": "npm run build && npm run test && npm run review"
+    "check": "npm run build && npm run test && npm run review",
+    "test:e2e": "npx playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "elm": "^0.19.1-6",
     "elm-review": "^2.13.5",
     "elm-test": "^0.19.1-revision12"
