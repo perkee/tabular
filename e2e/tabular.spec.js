@@ -110,6 +110,54 @@ test('import CSV populates the grid', async ({ page }) => {
   await expect(page.locator('#import-textarea')).toHaveCount(0);
 });
 
+// --- Copy buttons ---
+
+test('copy markdown button writes textarea value to clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+  const copyBtn = page.locator('copy-button[target="md-output"] button');
+  await copyBtn.click();
+
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  const mdValue = await page.locator('#md-output').inputValue();
+  expect(clipboardText).toBe(mdValue);
+});
+
+test('copy box-drawing button writes textarea value to clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+  const copyBtn = page.locator('copy-button[target="box-output"] button');
+  await copyBtn.click();
+
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  const boxValue = await page.locator('#box-output').inputValue();
+  expect(clipboardText).toBe(boxValue);
+});
+
+test('copy HTML button writes textarea value to clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+  const copyBtn = page.locator('copy-button[target="html-output"] button');
+  await copyBtn.click();
+
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  const htmlValue = await page.locator('#html-output').inputValue();
+  expect(clipboardText).toBe(htmlValue);
+});
+
+test('copy button shows "Copied!" feedback then resets', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+  const copyBtn = page.locator('copy-button[target="md-output"] button');
+  await expect(copyBtn).toHaveText('Copy');
+
+  await copyBtn.click();
+  await expect(copyBtn).toHaveText('Copied!');
+
+  // Resets back to "Copy" after ~1.5s
+  await expect(copyBtn).toHaveText('Copy', { timeout: 3000 });
+});
+
 test('import cancel hides the import panel', async ({ page }) => {
   await page.locator('#toggle-import').click();
   await expect(page.locator('#import-textarea')).toHaveCount(1);
