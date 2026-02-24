@@ -1866,7 +1866,7 @@ viewTableEditor model =
 
         alignmentRow =
             tr []
-                (td [] []
+                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
                     :: List.concatMap
                         (\c ->
                             let
@@ -1898,13 +1898,13 @@ viewTableEditor model =
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [] [] ]
+                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
                 )
 
         hSepRow hIdx =
@@ -2094,26 +2094,6 @@ viewTableEditor model =
                     )
                 ]
 
-        vsepControlRow =
-            tr []
-                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
-                    :: List.concatMap
-                        (\c ->
-                            let
-                                cellTd =
-                                    td [] []
-                            in
-                            if c < model.cols - 1 then
-                                [ cellTd
-                                , td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ]
-                                ]
-
-                            else
-                                [ cellTd ]
-                        )
-                        colRange
-                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
-                )
     in
     div [ Attr.class "table-container" ]
         [ if model.showImport then
@@ -2143,7 +2123,7 @@ viewTableEditor model =
           else
             text ""
         , table [ Attr.class "editor-table" ]
-            [ thead [] [ vsepControlRow, deleteColHeaderRow, alignmentRow ]
+            [ thead [] [ deleteColHeaderRow, alignmentRow ]
             , tbody [] bodyRows
             ]
         , div [ Attr.class "button-row" ]
