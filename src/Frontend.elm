@@ -1771,8 +1771,9 @@ body {
     border: none;
     background: transparent;
     cursor: pointer;
-    font-size: 10px;
-    color: #9ca3af;
+    font-size: 14px;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    color: #4a90d9;
     transition: all 0.15s;
     padding: 0;
     line-height: 1;
@@ -1922,14 +1923,31 @@ viewTableEditor model =
                 )
 
         hSepRow hIdx =
+            let
+                rowStyle =
+                    getHorizontalLineStyle hIdx model.horizontalLineStyles
+            in
             tr [ Attr.class "hsep-row" ]
                 (td [ Attr.style "padding" "0" ]
                     [ button
-                        [ Attr.class "hsep-setall-btn"
-                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " (set all)")
+                        [ Attr.class
+                            (if rowStyle == None then
+                                "hsep-setall-btn hsep-none"
+
+                             else
+                                "hsep-setall-btn"
+                            )
+                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel rowStyle ++ " (set all)")
                         , onClick (CycleHorizontalLineStyle hIdx)
                         ]
-                        [ text "↔" ]
+                        [ text
+                            (if rowStyle == None then
+                                "Ø"
+
+                             else
+                                horizontalChar rowStyle
+                            )
+                        ]
                     ]
                     :: List.concatMap
                         (\c ->
