@@ -5,7 +5,8 @@
     "test": "elm-test --compiler lamdera",
     "review": "elm-review",
     "check": "npm run build && npm run test && npm run review",
-    "test:e2e": "npx playwright test"
+    "test:e2e": "npx playwright test",
+    "create-pr": "scripts/create-pr.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
