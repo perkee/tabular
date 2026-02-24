@@ -38,6 +38,7 @@ init _ key =
                 , ( ( 0, 1 ), "Header 2" )
                 , ( ( 0, 2 ), "Header 3" )
                 ]
+      , alignments = Dict.empty
       , outputFormat = Expanded
       }
     , Cmd.none
@@ -86,6 +87,7 @@ update msg model =
                 ( { model
                     | cols = model.cols - 1
                     , cells = removeColumn colIndex model.cells
+                    , alignments = removeColumnAlignments colIndex model.alignments
                   }
                 , Cmd.none
                 )
@@ -95,6 +97,11 @@ update msg model =
 
         SetOutputFormat format ->
             ( { model | outputFormat = format }, Cmd.none )
+
+        SetAlignment col alignment ->
+            ( { model | alignments = Dict.insert col alignment model.alignments }
+            , Cmd.none
+            )
 
         NoOpFrontendMsg ->
             ( model, Cmd.none )
@@ -152,6 +159,62 @@ getCell row col cells =
     Dict.get ( row, col ) cells |> Maybe.withDefault ""
 
 
+removeColumnAlignments : Int -> Dict Int Alignment -> Dict Int Alignment
+removeColumnAlignments colToRemove alignments =
+    alignments
+        |> Dict.toList
+        |> List.filterMap
+            (\( c, a ) ->
+                if c == colToRemove then
+                    Nothing
+
+                else if c > colToRemove then
+                    Just ( c - 1, a )
+
+                else
+                    Just ( c, a )
+            )
+        |> Dict.fromList
+
+
+getAlignment : Int -> Dict Int Alignment -> Alignment
+getAlignment col alignments =
+    Dict.get col alignments |> Maybe.withDefault AlignLeft
+
+
+padLeft : String -> Int -> String
+padLeft content width =
+    String.repeat (width - String.length content) " " ++ content
+
+
+padCenter : String -> Int -> String
+padCenter content width =
+    let
+        totalPad =
+            width - String.length content
+
+        lp =
+            totalPad // 2
+
+        rp =
+            totalPad - lp
+    in
+    String.repeat lp " " ++ content ++ String.repeat rp " "
+
+
+padContent : Alignment -> String -> Int -> String
+padContent align content width =
+    case align of
+        AlignLeft ->
+            content ++ String.repeat (width - String.length content) " "
+
+        AlignCenter ->
+            padCenter content width
+
+        AlignRight ->
+            padLeft content width
+
+
 escapePipe : String -> String
 escapePipe s =
     String.replace "|" "\\|" s
@@ -161,8 +224,8 @@ escapePipe s =
 -- MARKDOWN GENERATION
 
 
-generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> String
-generateMarkdown format rows cols cells =
+generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> String
+generateMarkdown format rows cols cells alignments =
     if rows == 0 || cols == 0 then
         ""
 
@@ -187,9 +250,6 @@ generateMarkdown format rows cols cells =
                     )
                     colRange
 
-            padRight content width =
-                content ++ String.repeat (width - String.length content) " "
-
             formatRow r =
                 let
                     cellTexts =
@@ -201,23 +261,49 @@ generateMarkdown format rows cols cells =
 
                             Expanded ->
                                 List.map2
-                                    (\c w -> padRight (escapePipe (getCell r c cells)) w)
+                                    (\c w ->
+                                        padContent (getAlignment c alignments)
+                                            (escapePipe (getCell r c cells))
+                                            w
+                                    )
                                     colRange
                                     colWidths
                 in
                 "| " ++ String.join " | " cellTexts ++ " |"
 
-            separatorRow =
-                let
-                    separators =
-                        case format of
-                            Compact ->
-                                List.map (\_ -> "---") colRange
+            separatorCell align w =
+                case format of
+                    Compact ->
+                        case align of
+                            AlignLeft ->
+                                "---"
 
-                            Expanded ->
-                                List.map (\w -> String.repeat w "-") colWidths
-                in
-                "| " ++ String.join " | " separators ++ " |"
+                            AlignCenter ->
+                                ":-:"
+
+                            AlignRight ->
+                                "--:"
+
+                    Expanded ->
+                        case align of
+                            AlignLeft ->
+                                String.repeat w "-"
+
+                            AlignCenter ->
+                                ":" ++ String.repeat (w - 2) "-" ++ ":"
+
+                            AlignRight ->
+                                String.repeat (w - 1) "-" ++ ":"
+
+            separatorRow =
+                "| "
+                    ++ (List.map2
+                            (\c w -> separatorCell (getAlignment c alignments) w)
+                            colRange
+                            colWidths
+                            |> String.join " | "
+                       )
+                    ++ " |"
 
             headerRow =
                 formatRow 0
@@ -232,8 +318,8 @@ generateMarkdown format rows cols cells =
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> String
-generateBoxDrawing rows cols cells =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> String
+generateBoxDrawing rows cols cells alignments =
     if rows == 0 || cols == 0 then
         ""
 
@@ -271,13 +357,14 @@ generateBoxDrawing rows cols cells =
             bottomBorder =
                 horizontalLine "\u{2514}" "\u{2534}" "\u{2518}"
 
-            padRight content width =
-                content ++ String.repeat (width - String.length content) " "
-
             formatRow r =
                 "\u{2502} "
                     ++ (List.map2
-                            (\c w -> padRight (getCell r c cells) w)
+                            (\c w ->
+                                padContent (getAlignment c alignments)
+                                    (getCell r c cells)
+                                    w
+                            )
                             colRange
                             colWidths
                             |> String.join " \u{2502} "
@@ -434,6 +521,41 @@ body {
     color: #c0c4cc;
     background: none;
     border-color: transparent;
+}
+
+.align-group {
+    display: inline-flex;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.align-btn {
+    padding: 3px 8px;
+    border: none;
+    border-right: 1px solid #e5e7eb;
+    background: white;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.15s;
+    line-height: 1.2;
+}
+
+.align-btn:last-child {
+    border-right: none;
+}
+
+.align-btn:hover {
+    background: #f0f4ff;
+    color: #4a90d9;
+}
+
+.align-btn.active {
+    background: #4a90d9;
+    color: white;
 }
 
 .add-btn {
@@ -593,6 +715,41 @@ viewTableEditor model =
                     ++ [ td [] [] ]
                 )
 
+        alignmentRow =
+            tr []
+                (td [] []
+                    :: List.map
+                        (\c ->
+                            let
+                                currentAlign =
+                                    getAlignment c model.alignments
+
+                                alignBtn align label =
+                                    button
+                                        [ Attr.class
+                                            (if currentAlign == align then
+                                                "align-btn active"
+
+                                             else
+                                                "align-btn"
+                                            )
+                                        , onClick (SetAlignment c align)
+                                        , Attr.title label
+                                        ]
+                                        [ text label ]
+                            in
+                            td [ Attr.style "text-align" "center" ]
+                                [ div [ Attr.class "align-group" ]
+                                    [ alignBtn AlignLeft "L"
+                                    , alignBtn AlignCenter "C"
+                                    , alignBtn AlignRight "R"
+                                    ]
+                                ]
+                        )
+                        colRange
+                    ++ [ td [] [] ]
+                )
+
         dataRow r =
             tr []
                 (td [] []
@@ -636,7 +793,7 @@ viewTableEditor model =
     in
     div [ Attr.class "table-container" ]
         [ table [ Attr.class "editor-table" ]
-            [ thead [] [ deleteColHeaderRow ]
+            [ thead [] [ deleteColHeaderRow, alignmentRow ]
             , tbody [] (List.map dataRow rowRange)
             ]
         , div [ Attr.class "button-row" ]
@@ -652,7 +809,7 @@ viewMarkdownOutput : Model -> Html FrontendMsg
 viewMarkdownOutput model =
     let
         markdown =
-            generateMarkdown model.outputFormat model.rows model.cols model.cells
+            generateMarkdown model.outputFormat model.rows model.cols model.cells model.alignments
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]
@@ -703,7 +860,7 @@ viewBoxDrawingOutput : Model -> Html FrontendMsg
 viewBoxDrawingOutput model =
     let
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells
+            generateBoxDrawing model.rows model.cols model.cells model.alignments
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]

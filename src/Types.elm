@@ -11,8 +11,15 @@ type alias FrontendModel =
     , rows : Int
     , cols : Int
     , cells : Dict ( Int, Int ) String
+    , alignments : Dict Int Alignment
     , outputFormat : OutputFormat
     }
+
+
+type Alignment
+    = AlignLeft
+    | AlignCenter
+    | AlignRight
 
 
 type OutputFormat
@@ -34,6 +41,7 @@ type FrontendMsg
     | RemoveRow Int
     | RemoveColumn Int
     | SetOutputFormat OutputFormat
+    | SetAlignment Int Alignment
     | NoOpFrontendMsg
 
 
