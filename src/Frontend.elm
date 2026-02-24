@@ -1697,7 +1697,7 @@ body {
 .vsep-controls {
     display: flex;
     gap: 4px;
-    margin-top: 8px;
+    margin-bottom: 8px;
     align-items: center;
     padding-left: 2px;
 }
@@ -1923,7 +1923,14 @@ viewTableEditor model =
 
         hSepRow hIdx =
             tr [ Attr.class "hsep-row" ]
-                (td [ Attr.style "padding" "0" ] []
+                (td [ Attr.style "padding" "0" ]
+                    [ button
+                        [ Attr.class "hsep-setall-btn"
+                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " (set all)")
+                        , onClick (CycleHorizontalLineStyle hIdx)
+                        ]
+                        [ text "↔" ]
+                    ]
                     :: List.concatMap
                         (\c ->
                             let
@@ -1964,15 +1971,7 @@ viewTableEditor model =
                                 [ segmentTd ]
                         )
                         colRange
-                    ++ [ td [ Attr.style "padding" "0" ]
-                            [ button
-                                [ Attr.class "hsep-setall-btn"
-                                , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " (set all)")
-                                , onClick (CycleHorizontalLineStyle hIdx)
-                                ]
-                                [ text "↔" ]
-                            ]
-                       ]
+                    ++ [ td [ Attr.style "padding" "0" ] [] ]
                 )
 
         dataRow r =
@@ -2125,11 +2124,11 @@ viewTableEditor model =
 
           else
             text ""
+        , verticalSepControls
         , table [ Attr.class "editor-table" ]
             [ thead [] [ deleteColHeaderRow, alignmentRow ]
             , tbody [] bodyRows
             ]
-        , verticalSepControls
         , div [ Attr.class "button-row" ]
             [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
                 [ text "+ Row" ]
