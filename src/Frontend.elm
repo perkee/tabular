@@ -1774,6 +1774,10 @@ body {
 .hsep-none {
     opacity: 0.5;
 }
+
+.box-textarea {
+    line-height: 1.0;
+}
 """
         ]
 
@@ -2273,7 +2277,7 @@ viewBoxDrawingOutput model =
                 [ text "Copy" ]
             ]
         , textarea
-            [ Attr.class "output-textarea"
+            [ Attr.class "output-textarea box-textarea"
             , Attr.id "box-output"
             , Attr.readonly True
             , Attr.value boxDrawing
