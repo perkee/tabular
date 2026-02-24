@@ -229,6 +229,77 @@ generateMarkdown format rows cols cells =
 
 
 
+-- BOX DRAWING GENERATION
+
+
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> String
+generateBoxDrawing rows cols cells =
+    if rows == 0 || cols == 0 then
+        ""
+
+    else
+        let
+            colRange =
+                List.range 0 (cols - 1)
+
+            rowRange =
+                List.range 0 (rows - 1)
+
+            colWidths =
+                List.map
+                    (\c ->
+                        List.foldl
+                            (\r maxW -> max maxW (String.length (getCell r c cells)))
+                            1
+                            rowRange
+                    )
+                    colRange
+
+            horizontalLine left mid right =
+                left
+                    ++ (List.map (\w -> String.repeat (w + 2) "\u{2500}") colWidths
+                            |> String.join mid
+                       )
+                    ++ right
+
+            topBorder =
+                horizontalLine "\u{250C}" "\u{252C}" "\u{2510}"
+
+            midBorder =
+                horizontalLine "\u{251C}" "\u{253C}" "\u{2524}"
+
+            bottomBorder =
+                horizontalLine "\u{2514}" "\u{2534}" "\u{2518}"
+
+            padRight content width =
+                content ++ String.repeat (width - String.length content) " "
+
+            formatRow r =
+                "\u{2502} "
+                    ++ (List.map2
+                            (\c w -> padRight (getCell r c cells) w)
+                            colRange
+                            colWidths
+                            |> String.join " \u{2502} "
+                       )
+                    ++ " \u{2502}"
+
+            allRows =
+                List.concatMap
+                    (\r ->
+                        if r == 0 then
+                            [ topBorder, formatRow r ]
+
+                        else
+                            [ midBorder, formatRow r ]
+                    )
+                    rowRange
+                    ++ [ bottomBorder ]
+        in
+        String.join "\n" allRows
+
+
+
 -- VIEW
 
 
@@ -240,8 +311,8 @@ view model =
         , div [ Attr.class "app" ]
             [ viewHeader
             , viewTableEditor model
-            , viewFormatToggle model.outputFormat
-            , viewOutput model
+            , viewMarkdownOutput model
+            , viewBoxDrawingOutput model
             ]
         ]
     }
@@ -392,21 +463,10 @@ body {
     margin-top: 12px;
 }
 
-.format-section {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-    margin-bottom: 1rem;
+.output-controls {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-}
-
-.format-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #374151;
+    gap: 6px;
 }
 
 .format-btn {
@@ -437,6 +497,7 @@ body {
     border-radius: 12px;
     padding: 1.5rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    margin-bottom: 1rem;
 }
 
 .output-header {
@@ -587,50 +648,45 @@ viewTableEditor model =
         ]
 
 
-viewFormatToggle : OutputFormat -> Html FrontendMsg
-viewFormatToggle currentFormat =
-    div [ Attr.class "format-section" ]
-        [ span [ Attr.class "format-label" ] [ text "Format" ]
-        , button
-            [ Attr.class
-                (if currentFormat == Compact then
-                    "format-btn active"
-
-                 else
-                    "format-btn"
-                )
-            , onClick (SetOutputFormat Compact)
-            ]
-            [ text "Compact" ]
-        , button
-            [ Attr.class
-                (if currentFormat == Expanded then
-                    "format-btn active"
-
-                 else
-                    "format-btn"
-                )
-            , onClick (SetOutputFormat Expanded)
-            ]
-            [ text "Expanded" ]
-        ]
-
-
-viewOutput : Model -> Html FrontendMsg
-viewOutput model =
+viewMarkdownOutput : Model -> Html FrontendMsg
+viewMarkdownOutput model =
     let
         markdown =
             generateMarkdown model.outputFormat model.rows model.cols model.cells
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]
-            [ span [ Attr.class "output-title" ] [ text "Markdown Output" ]
-            , button
-                [ Attr.class "copy-btn"
-                , Attr.attribute "onclick"
-                    "var btn=this;navigator.clipboard.writeText(document.getElementById('md-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
+            [ span [ Attr.class "output-title" ] [ text "Markdown" ]
+            , div [ Attr.class "output-controls" ]
+                [ button
+                    [ Attr.class
+                        (if model.outputFormat == Compact then
+                            "format-btn active"
+
+                         else
+                            "format-btn"
+                        )
+                    , onClick (SetOutputFormat Compact)
+                    ]
+                    [ text "Compact" ]
+                , button
+                    [ Attr.class
+                        (if model.outputFormat == Expanded then
+                            "format-btn active"
+
+                         else
+                            "format-btn"
+                        )
+                    , onClick (SetOutputFormat Expanded)
+                    ]
+                    [ text "Expanded" ]
+                , button
+                    [ Attr.class "copy-btn"
+                    , Attr.attribute "onclick"
+                        "var btn=this;navigator.clipboard.writeText(document.getElementById('md-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
+                    ]
+                    [ text "Copy" ]
                 ]
-                [ text "Copy" ]
             ]
         , textarea
             [ Attr.class "output-textarea"
@@ -638,6 +694,33 @@ viewOutput model =
             , Attr.readonly True
             , Attr.value markdown
             , Attr.rows (max 4 (model.rows + 2))
+            ]
+            []
+        ]
+
+
+viewBoxDrawingOutput : Model -> Html FrontendMsg
+viewBoxDrawingOutput model =
+    let
+        boxDrawing =
+            generateBoxDrawing model.rows model.cols model.cells
+    in
+    div [ Attr.class "output-section" ]
+        [ div [ Attr.class "output-header" ]
+            [ span [ Attr.class "output-title" ] [ text "Box Drawing" ]
+            , button
+                [ Attr.class "copy-btn"
+                , Attr.attribute "onclick"
+                    "var btn=this;navigator.clipboard.writeText(document.getElementById('box-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
+                ]
+                [ text "Copy" ]
+            ]
+        , textarea
+            [ Attr.class "output-textarea"
+            , Attr.id "box-output"
+            , Attr.readonly True
+            , Attr.value boxDrawing
+            , Attr.rows (max 4 (model.rows * 2 + 1))
             ]
             []
         ]
