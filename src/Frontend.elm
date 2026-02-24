@@ -39,6 +39,8 @@ init _ key =
                 , ( ( 0, 2 ), "Header 3" )
                 ]
       , alignments = Dict.empty
+      , horizontalLineStyles = Dict.empty
+      , verticalLineStyles = Dict.empty
       , outputFormat = Expanded
       , showImport = False
       , importText = ""
@@ -77,6 +79,7 @@ update msg model =
                 ( { model
                     | rows = model.rows - 1
                     , cells = removeRow rowIndex model.cells
+                    , horizontalLineStyles = removeIndexFromDict (rowIndex + 1) model.horizontalLineStyles
                   }
                 , Cmd.none
                 )
@@ -90,6 +93,7 @@ update msg model =
                     | cols = model.cols - 1
                     , cells = removeColumn colIndex model.cells
                     , alignments = removeColumnAlignments colIndex model.alignments
+                    , verticalLineStyles = removeIndexFromDict (colIndex + 1) model.verticalLineStyles
                   }
                 , Cmd.none
                 )
@@ -124,6 +128,8 @@ update msg model =
                     , cols = parsed.cols
                     , cells = parsed.cells
                     , alignments = Dict.empty
+                    , horizontalLineStyles = Dict.empty
+                    , verticalLineStyles = Dict.empty
                     , showImport = False
                     , importText = ""
                   }
@@ -132,6 +138,24 @@ update msg model =
 
             else
                 ( model, Cmd.none )
+
+        CycleHorizontalLineStyle idx ->
+            let
+                current =
+                    getHorizontalLineStyle idx model.horizontalLineStyles
+            in
+            ( { model | horizontalLineStyles = Dict.insert idx (cycleLineStyle current) model.horizontalLineStyles }
+            , Cmd.none
+            )
+
+        CycleVerticalLineStyle idx ->
+            let
+                current =
+                    getVerticalLineStyle idx model.verticalLineStyles
+            in
+            ( { model | verticalLineStyles = Dict.insert idx (cycleLineStyle current) model.verticalLineStyles }
+            , Cmd.none
+            )
 
         NoOpFrontendMsg ->
             ( model, Cmd.none )
@@ -210,6 +234,411 @@ removeColumnAlignments colToRemove alignments =
 getAlignment : Int -> Dict Int Alignment -> Alignment
 getAlignment col alignments =
     Dict.get col alignments |> Maybe.withDefault AlignLeft
+
+
+removeIndexFromDict : Int -> Dict Int a -> Dict Int a
+removeIndexFromDict idx dict =
+    dict
+        |> Dict.toList
+        |> List.filterMap
+            (\( k, v ) ->
+                if k == idx then
+                    Nothing
+
+                else if k > idx then
+                    Just ( k - 1, v )
+
+                else
+                    Just ( k, v )
+            )
+        |> Dict.fromList
+
+
+getHorizontalLineStyle : Int -> Dict Int LineStyle -> LineStyle
+getHorizontalLineStyle idx styles =
+    Dict.get idx styles |> Maybe.withDefault Thin
+
+
+getVerticalLineStyle : Int -> Dict Int LineStyle -> LineStyle
+getVerticalLineStyle idx styles =
+    Dict.get idx styles |> Maybe.withDefault Thin
+
+
+cycleLineStyle : LineStyle -> LineStyle
+cycleLineStyle style =
+    case style of
+        Thin ->
+            Thick
+
+        Thick ->
+            ThinTripleDash
+
+        ThinTripleDash ->
+            ThickTripleDash
+
+        ThickTripleDash ->
+            ThinQuadDash
+
+        ThinQuadDash ->
+            ThickQuadDash
+
+        ThickQuadDash ->
+            ThinDoubleDash
+
+        ThinDoubleDash ->
+            ThickDoubleDash
+
+        ThickDoubleDash ->
+            Double
+
+        Double ->
+            Thin
+
+
+lineStyleWeight : LineStyle -> LineWeight
+lineStyleWeight style =
+    case style of
+        Thin ->
+            WLight
+
+        Thick ->
+            WHeavy
+
+        ThinTripleDash ->
+            WLight
+
+        ThickTripleDash ->
+            WHeavy
+
+        ThinQuadDash ->
+            WLight
+
+        ThickQuadDash ->
+            WHeavy
+
+        ThinDoubleDash ->
+            WLight
+
+        ThickDoubleDash ->
+            WHeavy
+
+        Double ->
+            WDouble
+
+
+horizontalChar : LineStyle -> String
+horizontalChar style =
+    case style of
+        Thin ->
+            "\u{2500}"
+
+        Thick ->
+            "\u{2501}"
+
+        ThinTripleDash ->
+            "\u{2504}"
+
+        ThickTripleDash ->
+            "\u{2505}"
+
+        ThinQuadDash ->
+            "\u{2508}"
+
+        ThickQuadDash ->
+            "\u{2509}"
+
+        ThinDoubleDash ->
+            "\u{254C}"
+
+        ThickDoubleDash ->
+            "\u{254D}"
+
+        Double ->
+            "\u{2550}"
+
+
+verticalChar : LineStyle -> String
+verticalChar style =
+    case style of
+        Thin ->
+            "\u{2502}"
+
+        Thick ->
+            "\u{2503}"
+
+        ThinTripleDash ->
+            "\u{2506}"
+
+        ThickTripleDash ->
+            "\u{2507}"
+
+        ThinQuadDash ->
+            "\u{250A}"
+
+        ThickQuadDash ->
+            "\u{250B}"
+
+        ThinDoubleDash ->
+            "\u{254E}"
+
+        ThickDoubleDash ->
+            "\u{254F}"
+
+        Double ->
+            "\u{2551}"
+
+
+weightCode : LineWeight -> Int
+weightCode w =
+    case w of
+        WNone ->
+            0
+
+        WLight ->
+            1
+
+        WHeavy ->
+            2
+
+        WDouble ->
+            3
+
+
+cornerKey : LineWeight -> LineWeight -> LineWeight -> LineWeight -> Int
+cornerKey up down left right =
+    weightCode up * 64 + weightCode down * 16 + weightCode left * 4 + weightCode right
+
+
+lookupCorner : LineWeight -> LineWeight -> LineWeight -> LineWeight -> String
+lookupCorner up down left right =
+    let
+        key =
+            cornerKey up down left right
+    in
+    case Dict.get key cornerDict of
+        Just ch ->
+            ch
+
+        Nothing ->
+            -- Fallback: downgrade Heavy to Light when mixing with Double
+            let
+                fix w =
+                    if w == WHeavy then
+                        WLight
+
+                    else
+                        w
+
+                fallbackKey =
+                    cornerKey (fix up) (fix down) (fix left) (fix right)
+            in
+            Dict.get fallbackKey cornerDict |> Maybe.withDefault "\u{253C}"
+
+
+cornerDict : Dict Int String
+cornerDict =
+    Dict.fromList
+        [ -- All Light
+          ( cornerKey WNone WLight WNone WLight, "\u{250C}" )
+        , ( cornerKey WNone WLight WLight WLight, "\u{252C}" )
+        , ( cornerKey WNone WLight WLight WNone, "\u{2510}" )
+        , ( cornerKey WLight WLight WNone WLight, "\u{251C}" )
+        , ( cornerKey WLight WLight WLight WLight, "\u{253C}" )
+        , ( cornerKey WLight WLight WLight WNone, "\u{2524}" )
+        , ( cornerKey WLight WNone WNone WLight, "\u{2514}" )
+        , ( cornerKey WLight WNone WLight WLight, "\u{2534}" )
+        , ( cornerKey WLight WNone WLight WNone, "\u{2518}" )
+
+        -- All Heavy
+        , ( cornerKey WNone WHeavy WNone WHeavy, "\u{250F}" )
+        , ( cornerKey WNone WHeavy WHeavy WHeavy, "\u{2533}" )
+        , ( cornerKey WNone WHeavy WHeavy WNone, "\u{2513}" )
+        , ( cornerKey WHeavy WHeavy WNone WHeavy, "\u{2523}" )
+        , ( cornerKey WHeavy WHeavy WHeavy WHeavy, "\u{254B}" )
+        , ( cornerKey WHeavy WHeavy WHeavy WNone, "\u{252B}" )
+        , ( cornerKey WHeavy WNone WNone WHeavy, "\u{2517}" )
+        , ( cornerKey WHeavy WNone WHeavy WHeavy, "\u{253B}" )
+        , ( cornerKey WHeavy WNone WHeavy WNone, "\u{251B}" )
+
+        -- All Double
+        , ( cornerKey WNone WDouble WNone WDouble, "\u{2554}" )
+        , ( cornerKey WNone WDouble WDouble WDouble, "\u{2566}" )
+        , ( cornerKey WNone WDouble WDouble WNone, "\u{2557}" )
+        , ( cornerKey WDouble WDouble WNone WDouble, "\u{2560}" )
+        , ( cornerKey WDouble WDouble WDouble WDouble, "\u{256C}" )
+        , ( cornerKey WDouble WDouble WDouble WNone, "\u{2563}" )
+        , ( cornerKey WDouble WNone WNone WDouble, "\u{255A}" )
+        , ( cornerKey WDouble WNone WDouble WDouble, "\u{2569}" )
+        , ( cornerKey WDouble WNone WDouble WNone, "\u{255D}" )
+
+        -- Light vertical, Heavy horizontal
+        , ( cornerKey WNone WLight WNone WHeavy, "\u{250D}" )
+        , ( cornerKey WNone WLight WHeavy WHeavy, "\u{252F}" )
+        , ( cornerKey WNone WLight WHeavy WNone, "\u{2511}" )
+        , ( cornerKey WLight WLight WNone WHeavy, "\u{251D}" )
+        , ( cornerKey WLight WLight WHeavy WHeavy, "\u{253F}" )
+        , ( cornerKey WLight WLight WHeavy WNone, "\u{2525}" )
+        , ( cornerKey WLight WNone WNone WHeavy, "\u{2515}" )
+        , ( cornerKey WLight WNone WHeavy WHeavy, "\u{2537}" )
+        , ( cornerKey WLight WNone WHeavy WNone, "\u{2519}" )
+
+        -- Heavy vertical, Light horizontal
+        , ( cornerKey WNone WHeavy WNone WLight, "\u{250E}" )
+        , ( cornerKey WNone WHeavy WLight WLight, "\u{2530}" )
+        , ( cornerKey WNone WHeavy WLight WNone, "\u{2512}" )
+        , ( cornerKey WHeavy WHeavy WNone WLight, "\u{2520}" )
+        , ( cornerKey WHeavy WHeavy WLight WLight, "\u{2542}" )
+        , ( cornerKey WHeavy WHeavy WLight WNone, "\u{2528}" )
+        , ( cornerKey WHeavy WNone WNone WLight, "\u{2516}" )
+        , ( cornerKey WHeavy WNone WLight WLight, "\u{2538}" )
+        , ( cornerKey WHeavy WNone WLight WNone, "\u{251A}" )
+
+        -- Light vertical, Double horizontal
+        , ( cornerKey WNone WLight WNone WDouble, "\u{2552}" )
+        , ( cornerKey WNone WLight WDouble WDouble, "\u{2564}" )
+        , ( cornerKey WNone WLight WDouble WNone, "\u{2555}" )
+        , ( cornerKey WLight WLight WNone WDouble, "\u{255E}" )
+        , ( cornerKey WLight WLight WDouble WDouble, "\u{256A}" )
+        , ( cornerKey WLight WLight WDouble WNone, "\u{2561}" )
+        , ( cornerKey WLight WNone WNone WDouble, "\u{2558}" )
+        , ( cornerKey WLight WNone WDouble WDouble, "\u{2567}" )
+        , ( cornerKey WLight WNone WDouble WNone, "\u{255B}" )
+
+        -- Double vertical, Light horizontal
+        , ( cornerKey WNone WDouble WNone WLight, "\u{2553}" )
+        , ( cornerKey WNone WDouble WLight WLight, "\u{2565}" )
+        , ( cornerKey WNone WDouble WLight WNone, "\u{2556}" )
+        , ( cornerKey WDouble WDouble WNone WLight, "\u{255F}" )
+        , ( cornerKey WDouble WDouble WLight WLight, "\u{256B}" )
+        , ( cornerKey WDouble WDouble WLight WNone, "\u{2562}" )
+        , ( cornerKey WDouble WNone WNone WLight, "\u{2559}" )
+        , ( cornerKey WDouble WNone WLight WLight, "\u{2568}" )
+        , ( cornerKey WDouble WNone WLight WNone, "\u{255C}" )
+
+        -- Mixed: Light down, Heavy up (and vice versa) with Light horizontal
+        , ( cornerKey WLight WHeavy WNone WLight, "\u{251F}" )
+        , ( cornerKey WLight WHeavy WLight WLight, "\u{2541}" )
+        , ( cornerKey WLight WHeavy WLight WNone, "\u{2527}" )
+        , ( cornerKey WHeavy WLight WNone WLight, "\u{251E}" )
+        , ( cornerKey WHeavy WLight WLight WLight, "\u{2540}" )
+        , ( cornerKey WHeavy WLight WLight WNone, "\u{2526}" )
+
+        -- Mixed: Light down, Heavy up with Heavy horizontal
+        , ( cornerKey WLight WHeavy WNone WHeavy, "\u{2522}" )
+        , ( cornerKey WLight WHeavy WHeavy WHeavy, "\u{254A}" )
+        , ( cornerKey WLight WHeavy WHeavy WNone, "\u{252A}" )
+        , ( cornerKey WHeavy WLight WNone WHeavy, "\u{2521}" )
+        , ( cornerKey WHeavy WLight WHeavy WHeavy, "\u{2549}" )
+        , ( cornerKey WHeavy WLight WHeavy WNone, "\u{2529}" )
+
+        -- Mixed horizontal: Light left, Heavy right (and vice versa) with Light vertical
+        , ( cornerKey WNone WLight WLight WHeavy, "\u{252D}" )
+        , ( cornerKey WNone WLight WHeavy WLight, "\u{252E}" )
+        , ( cornerKey WLight WLight WLight WHeavy, "\u{253D}" )
+        , ( cornerKey WLight WLight WHeavy WLight, "\u{253E}" )
+        , ( cornerKey WLight WNone WLight WHeavy, "\u{2535}" )
+        , ( cornerKey WLight WNone WHeavy WLight, "\u{2536}" )
+
+        -- Mixed horizontal: Light left, Heavy right with Heavy vertical
+        , ( cornerKey WNone WHeavy WLight WHeavy, "\u{2531}" )
+        , ( cornerKey WNone WHeavy WHeavy WLight, "\u{2532}" )
+        , ( cornerKey WHeavy WHeavy WLight WHeavy, "\u{2545}" )
+        , ( cornerKey WHeavy WHeavy WHeavy WLight, "\u{2546}" )
+        , ( cornerKey WHeavy WNone WLight WHeavy, "\u{2539}" )
+        , ( cornerKey WHeavy WNone WHeavy WLight, "\u{253A}" )
+
+        -- All four different: vertical mixed + horizontal mixed
+        , ( cornerKey WLight WHeavy WLight WHeavy, "\u{2543}" )
+        , ( cornerKey WLight WHeavy WHeavy WLight, "\u{2544}" )
+        , ( cornerKey WHeavy WLight WLight WHeavy, "\u{2547}" )
+        , ( cornerKey WHeavy WLight WHeavy WLight, "\u{2548}" )
+        ]
+
+
+lineStyleLabel : LineStyle -> String
+lineStyleLabel style =
+    case style of
+        Thin ->
+            "Thin"
+
+        Thick ->
+            "Thick"
+
+        ThinTripleDash ->
+            "Triple Dash"
+
+        ThickTripleDash ->
+            "Thick Triple"
+
+        ThinQuadDash ->
+            "Quad Dash"
+
+        ThickQuadDash ->
+            "Thick Quad"
+
+        ThinDoubleDash ->
+            "Double Dash"
+
+        ThickDoubleDash ->
+            "Thick Dbl Dash"
+
+        Double ->
+            "Double"
+
+
+hSepLabel : Int -> Int -> String
+hSepLabel idx rows =
+    if idx == 0 then
+        "Top border"
+
+    else if idx == rows then
+        "Bottom border"
+
+    else
+        "Row " ++ String.fromInt idx ++ "-" ++ String.fromInt (idx + 1)
+
+
+vSepLabel : Int -> Int -> String
+vSepLabel idx cols =
+    if idx == 0 then
+        "Left border"
+
+    else if idx == cols then
+        "Right border"
+
+    else
+        "Col " ++ String.fromInt idx ++ "-" ++ String.fromInt (idx + 1)
+
+
+lineStyleToCss : LineStyle -> String
+lineStyleToCss style =
+    case style of
+        Thin ->
+            "1px solid"
+
+        Thick ->
+            "3px solid"
+
+        ThinTripleDash ->
+            "1px dashed"
+
+        ThickTripleDash ->
+            "3px dashed"
+
+        ThinQuadDash ->
+            "1px dotted"
+
+        ThickQuadDash ->
+            "3px dotted"
+
+        ThinDoubleDash ->
+            "1px dashed"
+
+        ThickDoubleDash ->
+            "3px dashed"
+
+        Double ->
+            "3px double"
 
 
 padLeft : String -> Int -> String
@@ -393,8 +822,8 @@ generateMarkdown format rows cols cells alignments =
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> String
-generateBoxDrawing rows cols cells alignments =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> String
+generateBoxDrawing rows cols cells alignments hStyles vStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -416,25 +845,127 @@ generateBoxDrawing rows cols cells alignments =
                     )
                     colRange
 
-            horizontalLine left mid right =
-                left
-                    ++ (List.map (\w -> String.repeat (w + 2) "\u{2500}") colWidths
-                            |> String.join mid
-                       )
-                    ++ right
+            hStyle hIdx =
+                getHorizontalLineStyle hIdx hStyles
 
-            topBorder =
-                horizontalLine "\u{250C}" "\u{252C}" "\u{2510}"
+            vStyle vIdx =
+                getVerticalLineStyle vIdx vStyles
 
-            midBorder =
-                horizontalLine "\u{251C}" "\u{253C}" "\u{2524}"
+            hWeight hIdx =
+                lineStyleWeight (hStyle hIdx)
 
-            bottomBorder =
-                horizontalLine "\u{2514}" "\u{2534}" "\u{2518}"
+            vWeight vIdx =
+                lineStyleWeight (vStyle vIdx)
+
+            horizontalLine hIdx =
+                let
+                    hChar =
+                        horizontalChar (hStyle hIdx)
+
+                    upW =
+                        if hIdx == 0 then
+                            WNone
+
+                        else
+                            hWeight (hIdx - 1)
+
+                    downW =
+                        if hIdx == rows then
+                            WNone
+
+                        else
+                            hWeight hIdx
+
+                    -- Actually up/down come from vertical separators, left/right from horizontal
+                    -- Wait - re-reading the plan: up/down come from vertical separator at that column position
+                    -- left/right come from horizontal separator at the current row position
+                    -- Let me reconsider: at intersection (hIdx, vIdx):
+                    --   up = vertical separator vIdx, from row above = if hIdx > 0 then vWeight vIdx else WNone
+                    --   down = vertical separator vIdx, from row below = if hIdx < rows then vWeight vIdx else WNone
+                    --   left = horizontal separator hIdx, from col to left = if vIdx > 0 then hWeight hIdx else WNone
+                    --   right = horizontal separator hIdx, from col to right = if vIdx < cols then hWeight hIdx else WNone
+                    segments =
+                        List.map2
+                            (\c w -> String.repeat (w + 2) hChar)
+                            colRange
+                            colWidths
+
+                    intersections =
+                        List.map
+                            (\vIdx ->
+                                let
+                                    up =
+                                        if hIdx > 0 then
+                                            vWeight vIdx
+
+                                        else
+                                            WNone
+
+                                    down =
+                                        if hIdx < rows then
+                                            vWeight vIdx
+
+                                        else
+                                            WNone
+
+                                    left =
+                                        hWeight hIdx
+
+                                    right =
+                                        hWeight hIdx
+                                in
+                                lookupCorner up down left right
+                            )
+                            (List.range 1 (cols - 1))
+
+                    leftCorner =
+                        let
+                            up =
+                                if hIdx > 0 then
+                                    vWeight 0
+
+                                else
+                                    WNone
+
+                            down =
+                                if hIdx < rows then
+                                    vWeight 0
+
+                                else
+                                    WNone
+                        in
+                        lookupCorner up down WNone (hWeight hIdx)
+
+                    rightCorner =
+                        let
+                            up =
+                                if hIdx > 0 then
+                                    vWeight cols
+
+                                else
+                                    WNone
+
+                            down =
+                                if hIdx < rows then
+                                    vWeight cols
+
+                                else
+                                    WNone
+                        in
+                        lookupCorner up down (hWeight hIdx) WNone
+                in
+                leftCorner ++ String.join "" (interleave segments intersections) ++ rightCorner
 
             formatRow r =
-                "\u{2502} "
-                    ++ (List.map2
+                let
+                    leftV =
+                        verticalChar (vStyle 0)
+
+                    rightV =
+                        verticalChar (vStyle cols)
+
+                    cellTexts =
+                        List.map2
                             (\c w ->
                                 padContent (getAlignment c alignments)
                                     (getCell r c cells)
@@ -442,23 +973,40 @@ generateBoxDrawing rows cols cells alignments =
                             )
                             colRange
                             colWidths
-                            |> String.join " \u{2502} "
-                       )
-                    ++ " \u{2502}"
+
+                    innerSeps =
+                        List.map
+                            (\vIdx -> verticalChar (vStyle vIdx))
+                            (List.range 1 (cols - 1))
+                in
+                leftV ++ " " ++ String.join "" (interleave (List.map (\t -> t) cellTexts) (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
 
             allRows =
                 List.concatMap
                     (\r ->
                         if r == 0 then
-                            [ topBorder, formatRow r ]
+                            [ horizontalLine 0, formatRow r ]
 
                         else
-                            [ midBorder, formatRow r ]
+                            [ horizontalLine r, formatRow r ]
                     )
                     rowRange
-                    ++ [ bottomBorder ]
+                    ++ [ horizontalLine rows ]
         in
         String.join "\n" allRows
+
+
+interleave : List String -> List String -> List String
+interleave a b =
+    case ( a, b ) of
+        ( [], _ ) ->
+            []
+
+        ( x :: xs, [] ) ->
+            [ x ]
+
+        ( x :: xs, y :: ys ) ->
+            x :: y :: interleave xs ys
 
 
 
@@ -478,8 +1026,8 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> String
-generateHtmlTable rows cols cells alignments =
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> String
+generateHtmlTable rows cols cells alignments hStyles vStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -498,21 +1046,75 @@ generateHtmlTable rows cols cells alignments =
                     |> String.replace ">" "&gt;"
                     |> String.replace "\"" "&quot;"
 
+            cellBorderStyle r c =
+                let
+                    top =
+                        getHorizontalLineStyle r hStyles
+
+                    bottom =
+                        getHorizontalLineStyle (r + 1) hStyles
+
+                    left =
+                        getVerticalLineStyle c vStyles
+
+                    right =
+                        getVerticalLineStyle (c + 1) vStyles
+
+                    parts =
+                        List.filterMap identity
+                            [ if top /= Thin then
+                                Just ("border-top: " ++ lineStyleToCss top)
+
+                              else
+                                Nothing
+                            , if bottom /= Thin then
+                                Just ("border-bottom: " ++ lineStyleToCss bottom)
+
+                              else
+                                Nothing
+                            , if left /= Thin then
+                                Just ("border-left: " ++ lineStyleToCss left)
+
+                              else
+                                Nothing
+                            , if right /= Thin then
+                                Just ("border-right: " ++ lineStyleToCss right)
+
+                              else
+                                Nothing
+                            ]
+                in
+                parts
+
+            cellStyleAttr r c align =
+                let
+                    alignParts =
+                        if align /= AlignLeft then
+                            [ "text-align: " ++ alignmentToStyle align ]
+
+                        else
+                            []
+
+                    borderParts =
+                        cellBorderStyle r c
+
+                    allParts =
+                        alignParts ++ borderParts
+                in
+                if List.isEmpty allParts then
+                    ""
+
+                else
+                    " style=\"" ++ String.join "; " allParts ++ "\""
+
             headerCells =
                 List.map
                     (\c ->
                         let
                             align =
                                 getAlignment c alignments
-
-                            style =
-                                if align /= AlignLeft then
-                                    " style=\"text-align: " ++ alignmentToStyle align ++ "\""
-
-                                else
-                                    ""
                         in
-                        indent 3 ++ "<th" ++ style ++ ">" ++ escapeHtml (getCell 0 c cells) ++ "</th>"
+                        indent 3 ++ "<th" ++ cellStyleAttr 0 c align ++ ">" ++ escapeHtml (getCell 0 c cells) ++ "</th>"
                     )
                     colRange
 
@@ -533,15 +1135,8 @@ generateHtmlTable rows cols cells alignments =
                                 let
                                     align =
                                         getAlignment c alignments
-
-                                    style =
-                                        if align /= AlignLeft then
-                                            " style=\"text-align: " ++ alignmentToStyle align ++ "\""
-
-                                        else
-                                            ""
                                 in
-                                indent 3 ++ "<td" ++ style ++ ">" ++ escapeHtml (getCell r c cells) ++ "</td>"
+                                indent 3 ++ "<td" ++ cellStyleAttr r c align ++ ">" ++ escapeHtml (getCell r c cells) ++ "</td>"
                             )
                             colRange
                 in
@@ -909,6 +1504,71 @@ body {
     gap: 8px;
     margin-top: 8px;
 }
+
+.hsep-row td {
+    padding: 0 !important;
+}
+
+.hsep-btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    height: 12px;
+    position: relative;
+}
+
+.hsep-btn:hover {
+    background: #f0f4ff;
+}
+
+.hsep-indicator {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    right: 8px;
+    height: 0;
+}
+
+.vsep-controls {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    align-items: center;
+    padding-left: 2px;
+}
+
+.vsep-controls::before {
+    content: 'Vertical:';
+    font-size: 11px;
+    color: #6b7280;
+    margin-right: 4px;
+}
+
+.vsep-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #4a90d9;
+    transition: all 0.15s;
+    line-height: 1;
+}
+
+.vsep-btn:hover {
+    background: #f0f4ff;
+    border-color: #4a90d9;
+}
 """
         ]
 
@@ -990,6 +1650,26 @@ viewTableEditor model =
                     ++ [ td [] [] ]
                 )
 
+        hSepRow hIdx =
+            tr [ Attr.class "hsep-row" ]
+                [ td
+                    [ Attr.attribute "colspan" (String.fromInt (model.cols + 2))
+                    , Attr.style "padding" "0"
+                    ]
+                    [ button
+                        [ Attr.class "hsep-btn"
+                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles))
+                        , onClick (CycleHorizontalLineStyle hIdx)
+                        ]
+                        [ div
+                            [ Attr.class "hsep-indicator"
+                            , Attr.style "border-top" (lineStyleToCss (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " #4a90d9")
+                            ]
+                            []
+                        ]
+                    ]
+                ]
+
         dataRow r =
             tr []
                 (td [] []
@@ -1030,6 +1710,32 @@ viewTableEditor model =
                             ]
                        ]
                 )
+
+        bodyRows =
+            List.concatMap
+                (\r ->
+                    if r == 0 then
+                        [ hSepRow 0, dataRow r ]
+
+                    else
+                        [ hSepRow r, dataRow r ]
+                )
+                rowRange
+                ++ [ hSepRow model.rows ]
+
+        verticalSepControls =
+            div [ Attr.class "vsep-controls" ]
+                (List.map
+                    (\vIdx ->
+                        button
+                            [ Attr.class "vsep-btn"
+                            , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel (getVerticalLineStyle vIdx model.verticalLineStyles))
+                            , onClick (CycleVerticalLineStyle vIdx)
+                            ]
+                            [ text (verticalChar (getVerticalLineStyle vIdx model.verticalLineStyles)) ]
+                    )
+                    (List.range 0 model.cols)
+                )
     in
     div [ Attr.class "table-container" ]
         ([ if model.showImport then
@@ -1058,8 +1764,9 @@ viewTableEditor model =
             text ""
          , table [ Attr.class "editor-table" ]
             [ thead [] [ deleteColHeaderRow, alignmentRow ]
-            , tbody [] (List.map dataRow rowRange)
+            , tbody [] bodyRows
             ]
+         , verticalSepControls
          , div [ Attr.class "button-row" ]
             [ button [ Attr.class "add-btn", onClick AddRow ]
                 [ text "+ Row" ]
@@ -1136,14 +1843,54 @@ viewRenderedTable model =
         colRange =
             List.range 0 (model.cols - 1)
 
-        alignStyle col =
-            Attr.style "text-align" (alignmentToStyle (getAlignment col model.alignments))
+        cellAttrs r c =
+            let
+                align =
+                    getAlignment c model.alignments
+
+                top =
+                    getHorizontalLineStyle r model.horizontalLineStyles
+
+                bottom =
+                    getHorizontalLineStyle (r + 1) model.horizontalLineStyles
+
+                left =
+                    getVerticalLineStyle c model.verticalLineStyles
+
+                right =
+                    getVerticalLineStyle (c + 1) model.verticalLineStyles
+
+                borderAttrs =
+                    List.filterMap identity
+                        [ if top /= Thin then
+                            Just (Attr.style "border-top" (lineStyleToCss top ++ " #e5e7eb"))
+
+                          else
+                            Nothing
+                        , if bottom /= Thin then
+                            Just (Attr.style "border-bottom" (lineStyleToCss bottom ++ " #e5e7eb"))
+
+                          else
+                            Nothing
+                        , if left /= Thin then
+                            Just (Attr.style "border-left" (lineStyleToCss left ++ " #e5e7eb"))
+
+                          else
+                            Nothing
+                        , if right /= Thin then
+                            Just (Attr.style "border-right" (lineStyleToCss right ++ " #e5e7eb"))
+
+                          else
+                            Nothing
+                        ]
+            in
+            Attr.style "text-align" (alignmentToStyle align) :: borderAttrs
 
         headerRow =
             tr []
                 (List.map
                     (\c ->
-                        th [ alignStyle c ] [ text (getCell 0 c model.cells) ]
+                        th (cellAttrs 0 c) [ text (getCell 0 c model.cells) ]
                     )
                     colRange
                 )
@@ -1154,7 +1901,7 @@ viewRenderedTable model =
                     tr []
                         (List.map
                             (\c ->
-                                td [ alignStyle c ] [ text (getCell r c model.cells) ]
+                                td (cellAttrs r c) [ text (getCell r c model.cells) ]
                             )
                             colRange
                         )
@@ -1178,7 +1925,7 @@ viewHtmlTableOutput : Model -> Html FrontendMsg
 viewHtmlTableOutput model =
     let
         htmlTable =
-            generateHtmlTable model.rows model.cols model.cells model.alignments
+            generateHtmlTable model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]
@@ -1205,7 +1952,7 @@ viewBoxDrawingOutput : Model -> Html FrontendMsg
 viewBoxDrawingOutput model =
     let
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.alignments
+            generateBoxDrawing model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]

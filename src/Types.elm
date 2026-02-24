@@ -12,6 +12,8 @@ type alias FrontendModel =
     , cols : Int
     , cells : Dict ( Int, Int ) String
     , alignments : Dict Int Alignment
+    , horizontalLineStyles : Dict Int LineStyle
+    , verticalLineStyles : Dict Int LineStyle
     , outputFormat : OutputFormat
     , showImport : Bool
     , importText : String
@@ -22,6 +24,25 @@ type Alignment
     = AlignLeft
     | AlignCenter
     | AlignRight
+
+
+type LineStyle
+    = Thin
+    | Thick
+    | ThinTripleDash
+    | ThickTripleDash
+    | ThinQuadDash
+    | ThickQuadDash
+    | ThinDoubleDash
+    | ThickDoubleDash
+    | Double
+
+
+type LineWeight
+    = WNone
+    | WLight
+    | WHeavy
+    | WDouble
 
 
 type OutputFormat
@@ -47,6 +68,8 @@ type FrontendMsg
     | ToggleImport
     | ImportTextChanged String
     | ImportData
+    | CycleHorizontalLineStyle Int
+    | CycleVerticalLineStyle Int
     | NoOpFrontendMsg
 
 
