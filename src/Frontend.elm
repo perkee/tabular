@@ -568,7 +568,7 @@ lookupCorner up down left right =
                 ch
 
             Nothing ->
-                -- Fallback: downgrade Heavy to Light when mixing with Double
+                -- Fallback 1: downgrade Heavy to Light when mixing with Double
                 let
                     fix w =
                         if w == WHeavy then
@@ -580,14 +580,28 @@ lookupCorner up down left right =
                     fallbackKey =
                         cornerKey (fix up) (fix down) (fix left) (fix right)
                 in
-                -- Try with WNone->WNone preserved (for partial None borders)
                 case Dict.get fallbackKey cornerDict of
                     Just ch ->
                         ch
 
                     Nothing ->
-                        -- Last resort: treat WNone as absent
-                        " "
+                        -- Fallback 2: downgrade both Heavy and Double to Light
+                        let
+                            simplify w =
+                                case w of
+                                    WHeavy ->
+                                        WLight
+
+                                    WDouble ->
+                                        WLight
+
+                                    _ ->
+                                        w
+
+                            simpleKey =
+                                cornerKey (simplify up) (simplify down) (simplify left) (simplify right)
+                        in
+                        Dict.get simpleKey cornerDict |> Maybe.withDefault " "
 
 
 cornerDict : Dict Int String
