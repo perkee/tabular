@@ -1694,21 +1694,6 @@ body {
     height: 0;
 }
 
-.vsep-controls {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 8px;
-    align-items: center;
-    padding-left: 2px;
-}
-
-.vsep-controls::before {
-    content: 'Vertical:';
-    font-size: 11px;
-    color: #6b7280;
-    margin-right: 4px;
-}
-
 .vsep-btn {
     width: 28px;
     height: 28px;
@@ -2084,35 +2069,50 @@ viewTableEditor model =
                 rowRange
                 ++ [ hSepRow model.rows ]
 
-        verticalSepControls =
-            div [ Attr.class "vsep-controls" ]
-                (List.map
-                    (\vIdx ->
-                        let
-                            style =
-                                getVerticalLineStyle vIdx model.verticalLineStyles
-                        in
-                        button
-                            [ Attr.class
-                                (if style == None then
-                                    "vsep-btn vsep-none"
+        vsepButton vIdx =
+            let
+                style =
+                    getVerticalLineStyle vIdx model.verticalLineStyles
+            in
+            button
+                [ Attr.class
+                    (if style == None then
+                        "vsep-btn vsep-none"
 
-                                 else
-                                    "vsep-btn"
-                                )
-                            , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel style)
-                            , onClick (CycleVerticalLineStyle vIdx)
-                            ]
-                            [ text
-                                (if style == None then
-                                    "Ø"
-
-                                 else
-                                    verticalChar style
-                                )
-                            ]
+                     else
+                        "vsep-btn"
                     )
-                    (List.range 0 model.cols)
+                , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel style)
+                , onClick (CycleVerticalLineStyle vIdx)
+                ]
+                [ text
+                    (if style == None then
+                        "Ø"
+
+                     else
+                        verticalChar style
+                    )
+                ]
+
+        vsepControlRow =
+            tr []
+                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                cellTd =
+                                    td [] []
+                            in
+                            if c < model.cols - 1 then
+                                [ cellTd
+                                , td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ]
+                                ]
+
+                            else
+                                [ cellTd ]
+                        )
+                        colRange
+                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
                 )
     in
     div [ Attr.class "table-container" ]
@@ -2142,9 +2142,8 @@ viewTableEditor model =
 
           else
             text ""
-        , verticalSepControls
         , table [ Attr.class "editor-table" ]
-            [ thead [] [ deleteColHeaderRow, alignmentRow ]
+            [ thead [] [ vsepControlRow, deleteColHeaderRow, alignmentRow ]
             , tbody [] bodyRows
             ]
         , div [ Attr.class "button-row" ]
