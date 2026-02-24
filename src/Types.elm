@@ -1,13 +1,14 @@
 module Types exposing (..)
 
-import Browser exposing (UrlRequest)
-import Browser.Navigation exposing (Key)
+import Browser
+import Browser.Navigation
 import Dict exposing (Dict)
+import Effect.Browser.Navigation
 import Url exposing (Url)
 
 
 type alias FrontendModel =
-    { key : Key
+    { key : Effect.Browser.Navigation.Key
     , rows : Int
     , cols : Int
     , cells : Dict ( Int, Int ) String
@@ -59,7 +60,7 @@ type alias BackendModel =
 
 
 type FrontendMsg
-    = UrlClicked UrlRequest
+    = UrlClicked Browser.UrlRequest
     | UrlChanged Url
     | CellChanged Int Int String
     | AddRow

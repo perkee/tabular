@@ -1,8 +1,11 @@
 module Frontend exposing (..)
 
-import Browser exposing (UrlRequest(..))
-import Browser.Navigation as Nav
+import Browser
 import Dict exposing (Dict)
+import Effect.Browser.Navigation as Nav
+import Effect.Command as Command exposing (Command, FrontendOnly)
+import Effect.Lamdera
+import Effect.Subscription as Subscription exposing (Subscription)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
@@ -16,18 +19,23 @@ type alias Model =
 
 
 app =
-    Lamdera.frontend
-        { init = init
-        , onUrlRequest = UrlClicked
-        , onUrlChange = UrlChanged
-        , update = update
-        , updateFromBackend = updateFromBackend
-        , subscriptions = \_ -> Sub.none
-        , view = view
-        }
+    Effect.Lamdera.frontend
+        Lamdera.sendToBackend
+        app_
 
 
-init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
+app_ =
+    { init = init
+    , onUrlRequest = UrlClicked
+    , onUrlChange = UrlChanged
+    , update = update
+    , updateFromBackend = updateFromBackend
+    , subscriptions = \_ -> Subscription.none
+    , view = view
+    }
+
+
+init : Url.Url -> Nav.Key -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
 init _ key =
     ( { key = key
       , rows = 3
@@ -47,34 +55,34 @@ init _ key =
       , showImport = False
       , importText = ""
       }
-    , Cmd.none
+    , Command.none
     )
 
 
-update : FrontendMsg -> Model -> ( Model, Cmd FrontendMsg )
+update : FrontendMsg -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
 update msg model =
     case msg of
         UrlClicked urlRequest ->
             case urlRequest of
-                Internal url ->
+                Browser.Internal url ->
                     ( model, Nav.pushUrl model.key (Url.toString url) )
 
-                External url ->
+                Browser.External url ->
                     ( model, Nav.load url )
 
         UrlChanged _ ->
-            ( model, Cmd.none )
+            ( model, Command.none )
 
         CellChanged row col value ->
             ( { model | cells = Dict.insert ( row, col ) value model.cells }
-            , Cmd.none
+            , Command.none
             )
 
         AddRow ->
-            ( { model | rows = model.rows + 1 }, Cmd.none )
+            ( { model | rows = model.rows + 1 }, Command.none )
 
         AddColumn ->
-            ( { model | cols = model.cols + 1 }, Cmd.none )
+            ( { model | cols = model.cols + 1 }, Command.none )
 
         RemoveRow rowIndex ->
             if model.rows > 1 then
@@ -85,11 +93,11 @@ update msg model =
                     , cellHorizontalStyles = removeCellStyleRow rowIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleRow rowIndex model.cellVerticalStyles
                   }
-                , Cmd.none
+                , Command.none
                 )
 
             else
-                ( model, Cmd.none )
+                ( model, Command.none )
 
         RemoveColumn colIndex ->
             if model.cols > 1 then
@@ -101,27 +109,27 @@ update msg model =
                     , cellHorizontalStyles = removeCellStyleCol colIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleCol colIndex model.cellVerticalStyles
                   }
-                , Cmd.none
+                , Command.none
                 )
 
             else
-                ( model, Cmd.none )
+                ( model, Command.none )
 
         SetOutputFormat format ->
-            ( { model | outputFormat = format }, Cmd.none )
+            ( { model | outputFormat = format }, Command.none )
 
         SetAlignment col alignment ->
             ( { model | alignments = Dict.insert col alignment model.alignments }
-            , Cmd.none
+            , Command.none
             )
 
         ToggleImport ->
             ( { model | showImport = not model.showImport, importText = "" }
-            , Cmd.none
+            , Command.none
             )
 
         ImportTextChanged value ->
-            ( { model | importText = value }, Cmd.none )
+            ( { model | importText = value }, Command.none )
 
         ImportData ->
             let
@@ -141,11 +149,11 @@ update msg model =
                     , showImport = False
                     , importText = ""
                   }
-                , Cmd.none
+                , Command.none
                 )
 
             else
-                ( model, Cmd.none )
+                ( model, Command.none )
 
         CycleHorizontalLineStyle idx ->
             let
@@ -160,7 +168,7 @@ update msg model =
                 | horizontalLineStyles = Dict.insert idx (cycleLineStyle current) model.horizontalLineStyles
                 , cellHorizontalStyles = clearedCellStyles
               }
-            , Cmd.none
+            , Command.none
             )
 
         CycleVerticalLineStyle idx ->
@@ -176,7 +184,7 @@ update msg model =
                 | verticalLineStyles = Dict.insert idx (cycleLineStyle current) model.verticalLineStyles
                 , cellVerticalStyles = clearedCellStyles
               }
-            , Cmd.none
+            , Command.none
             )
 
         CycleCellHorizontalStyle hIdx col ->
@@ -185,7 +193,7 @@ update msg model =
                     getEffectiveHStyle hIdx col model.cellHorizontalStyles model.horizontalLineStyles
             in
             ( { model | cellHorizontalStyles = Dict.insert ( hIdx, col ) (cycleLineStyle current) model.cellHorizontalStyles }
-            , Cmd.none
+            , Command.none
             )
 
         CycleCellVerticalStyle row vIdx ->
@@ -194,18 +202,18 @@ update msg model =
                     getEffectiveVStyle row vIdx model.cellVerticalStyles model.verticalLineStyles
             in
             ( { model | cellVerticalStyles = Dict.insert ( row, vIdx ) (cycleLineStyle current) model.cellVerticalStyles }
-            , Cmd.none
+            , Command.none
             )
 
         NoOpFrontendMsg ->
-            ( model, Cmd.none )
+            ( model, Command.none )
 
 
-updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
+updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
 updateFromBackend msg model =
     case msg of
         NoOpToFrontend ->
-            ( model, Cmd.none )
+            ( model, Command.none )
 
 
 
@@ -471,31 +479,31 @@ horizontalChar style =
             " "
 
         Thin ->
-            "\u{2500}"
+            "─"
 
         Thick ->
-            "\u{2501}"
+            "━"
 
         ThinTripleDash ->
-            "\u{2504}"
+            "┄"
 
         ThickTripleDash ->
-            "\u{2505}"
+            "┅"
 
         ThinQuadDash ->
-            "\u{2508}"
+            "┈"
 
         ThickQuadDash ->
-            "\u{2509}"
+            "┉"
 
         ThinDoubleDash ->
-            "\u{254C}"
+            "╌"
 
         ThickDoubleDash ->
-            "\u{254D}"
+            "╍"
 
         Double ->
-            "\u{2550}"
+            "═"
 
 
 verticalChar : LineStyle -> String
@@ -505,31 +513,31 @@ verticalChar style =
             " "
 
         Thin ->
-            "\u{2502}"
+            "│"
 
         Thick ->
-            "\u{2503}"
+            "┃"
 
         ThinTripleDash ->
-            "\u{2506}"
+            "┆"
 
         ThickTripleDash ->
-            "\u{2507}"
+            "┇"
 
         ThinQuadDash ->
-            "\u{250A}"
+            "┊"
 
         ThickQuadDash ->
-            "\u{250B}"
+            "┋"
 
         ThinDoubleDash ->
-            "\u{254E}"
+            "╎"
 
         ThickDoubleDash ->
-            "\u{254F}"
+            "╏"
 
         Double ->
-            "\u{2551}"
+            "║"
 
 
 weightCode : LineWeight -> Int
@@ -608,119 +616,119 @@ cornerDict : Dict Int String
 cornerDict =
     Dict.fromList
         [ -- All Light
-          ( cornerKey WNone WLight WNone WLight, "\u{250C}" )
-        , ( cornerKey WNone WLight WLight WLight, "\u{252C}" )
-        , ( cornerKey WNone WLight WLight WNone, "\u{2510}" )
-        , ( cornerKey WLight WLight WNone WLight, "\u{251C}" )
-        , ( cornerKey WLight WLight WLight WLight, "\u{253C}" )
-        , ( cornerKey WLight WLight WLight WNone, "\u{2524}" )
-        , ( cornerKey WLight WNone WNone WLight, "\u{2514}" )
-        , ( cornerKey WLight WNone WLight WLight, "\u{2534}" )
-        , ( cornerKey WLight WNone WLight WNone, "\u{2518}" )
+          ( cornerKey WNone WLight WNone WLight, "┌" )
+        , ( cornerKey WNone WLight WLight WLight, "┬" )
+        , ( cornerKey WNone WLight WLight WNone, "┐" )
+        , ( cornerKey WLight WLight WNone WLight, "├" )
+        , ( cornerKey WLight WLight WLight WLight, "┼" )
+        , ( cornerKey WLight WLight WLight WNone, "┤" )
+        , ( cornerKey WLight WNone WNone WLight, "└" )
+        , ( cornerKey WLight WNone WLight WLight, "┴" )
+        , ( cornerKey WLight WNone WLight WNone, "┘" )
 
         -- All Heavy
-        , ( cornerKey WNone WHeavy WNone WHeavy, "\u{250F}" )
-        , ( cornerKey WNone WHeavy WHeavy WHeavy, "\u{2533}" )
-        , ( cornerKey WNone WHeavy WHeavy WNone, "\u{2513}" )
-        , ( cornerKey WHeavy WHeavy WNone WHeavy, "\u{2523}" )
-        , ( cornerKey WHeavy WHeavy WHeavy WHeavy, "\u{254B}" )
-        , ( cornerKey WHeavy WHeavy WHeavy WNone, "\u{252B}" )
-        , ( cornerKey WHeavy WNone WNone WHeavy, "\u{2517}" )
-        , ( cornerKey WHeavy WNone WHeavy WHeavy, "\u{253B}" )
-        , ( cornerKey WHeavy WNone WHeavy WNone, "\u{251B}" )
+        , ( cornerKey WNone WHeavy WNone WHeavy, "┏" )
+        , ( cornerKey WNone WHeavy WHeavy WHeavy, "┳" )
+        , ( cornerKey WNone WHeavy WHeavy WNone, "┓" )
+        , ( cornerKey WHeavy WHeavy WNone WHeavy, "┣" )
+        , ( cornerKey WHeavy WHeavy WHeavy WHeavy, "╋" )
+        , ( cornerKey WHeavy WHeavy WHeavy WNone, "┫" )
+        , ( cornerKey WHeavy WNone WNone WHeavy, "┗" )
+        , ( cornerKey WHeavy WNone WHeavy WHeavy, "┻" )
+        , ( cornerKey WHeavy WNone WHeavy WNone, "┛" )
 
         -- All Double
-        , ( cornerKey WNone WDouble WNone WDouble, "\u{2554}" )
-        , ( cornerKey WNone WDouble WDouble WDouble, "\u{2566}" )
-        , ( cornerKey WNone WDouble WDouble WNone, "\u{2557}" )
-        , ( cornerKey WDouble WDouble WNone WDouble, "\u{2560}" )
-        , ( cornerKey WDouble WDouble WDouble WDouble, "\u{256C}" )
-        , ( cornerKey WDouble WDouble WDouble WNone, "\u{2563}" )
-        , ( cornerKey WDouble WNone WNone WDouble, "\u{255A}" )
-        , ( cornerKey WDouble WNone WDouble WDouble, "\u{2569}" )
-        , ( cornerKey WDouble WNone WDouble WNone, "\u{255D}" )
+        , ( cornerKey WNone WDouble WNone WDouble, "╔" )
+        , ( cornerKey WNone WDouble WDouble WDouble, "╦" )
+        , ( cornerKey WNone WDouble WDouble WNone, "╗" )
+        , ( cornerKey WDouble WDouble WNone WDouble, "╠" )
+        , ( cornerKey WDouble WDouble WDouble WDouble, "╬" )
+        , ( cornerKey WDouble WDouble WDouble WNone, "╣" )
+        , ( cornerKey WDouble WNone WNone WDouble, "╚" )
+        , ( cornerKey WDouble WNone WDouble WDouble, "╩" )
+        , ( cornerKey WDouble WNone WDouble WNone, "╝" )
 
         -- Light vertical, Heavy horizontal
-        , ( cornerKey WNone WLight WNone WHeavy, "\u{250D}" )
-        , ( cornerKey WNone WLight WHeavy WHeavy, "\u{252F}" )
-        , ( cornerKey WNone WLight WHeavy WNone, "\u{2511}" )
-        , ( cornerKey WLight WLight WNone WHeavy, "\u{251D}" )
-        , ( cornerKey WLight WLight WHeavy WHeavy, "\u{253F}" )
-        , ( cornerKey WLight WLight WHeavy WNone, "\u{2525}" )
-        , ( cornerKey WLight WNone WNone WHeavy, "\u{2515}" )
-        , ( cornerKey WLight WNone WHeavy WHeavy, "\u{2537}" )
-        , ( cornerKey WLight WNone WHeavy WNone, "\u{2519}" )
+        , ( cornerKey WNone WLight WNone WHeavy, "┍" )
+        , ( cornerKey WNone WLight WHeavy WHeavy, "┯" )
+        , ( cornerKey WNone WLight WHeavy WNone, "┑" )
+        , ( cornerKey WLight WLight WNone WHeavy, "┝" )
+        , ( cornerKey WLight WLight WHeavy WHeavy, "┿" )
+        , ( cornerKey WLight WLight WHeavy WNone, "┥" )
+        , ( cornerKey WLight WNone WNone WHeavy, "┕" )
+        , ( cornerKey WLight WNone WHeavy WHeavy, "┷" )
+        , ( cornerKey WLight WNone WHeavy WNone, "┙" )
 
         -- Heavy vertical, Light horizontal
-        , ( cornerKey WNone WHeavy WNone WLight, "\u{250E}" )
-        , ( cornerKey WNone WHeavy WLight WLight, "\u{2530}" )
-        , ( cornerKey WNone WHeavy WLight WNone, "\u{2512}" )
-        , ( cornerKey WHeavy WHeavy WNone WLight, "\u{2520}" )
-        , ( cornerKey WHeavy WHeavy WLight WLight, "\u{2542}" )
-        , ( cornerKey WHeavy WHeavy WLight WNone, "\u{2528}" )
-        , ( cornerKey WHeavy WNone WNone WLight, "\u{2516}" )
-        , ( cornerKey WHeavy WNone WLight WLight, "\u{2538}" )
-        , ( cornerKey WHeavy WNone WLight WNone, "\u{251A}" )
+        , ( cornerKey WNone WHeavy WNone WLight, "┎" )
+        , ( cornerKey WNone WHeavy WLight WLight, "┰" )
+        , ( cornerKey WNone WHeavy WLight WNone, "┒" )
+        , ( cornerKey WHeavy WHeavy WNone WLight, "┠" )
+        , ( cornerKey WHeavy WHeavy WLight WLight, "╂" )
+        , ( cornerKey WHeavy WHeavy WLight WNone, "┨" )
+        , ( cornerKey WHeavy WNone WNone WLight, "┖" )
+        , ( cornerKey WHeavy WNone WLight WLight, "┸" )
+        , ( cornerKey WHeavy WNone WLight WNone, "┚" )
 
         -- Light vertical, Double horizontal
-        , ( cornerKey WNone WLight WNone WDouble, "\u{2552}" )
-        , ( cornerKey WNone WLight WDouble WDouble, "\u{2564}" )
-        , ( cornerKey WNone WLight WDouble WNone, "\u{2555}" )
-        , ( cornerKey WLight WLight WNone WDouble, "\u{255E}" )
-        , ( cornerKey WLight WLight WDouble WDouble, "\u{256A}" )
-        , ( cornerKey WLight WLight WDouble WNone, "\u{2561}" )
-        , ( cornerKey WLight WNone WNone WDouble, "\u{2558}" )
-        , ( cornerKey WLight WNone WDouble WDouble, "\u{2567}" )
-        , ( cornerKey WLight WNone WDouble WNone, "\u{255B}" )
+        , ( cornerKey WNone WLight WNone WDouble, "╒" )
+        , ( cornerKey WNone WLight WDouble WDouble, "╤" )
+        , ( cornerKey WNone WLight WDouble WNone, "╕" )
+        , ( cornerKey WLight WLight WNone WDouble, "╞" )
+        , ( cornerKey WLight WLight WDouble WDouble, "╪" )
+        , ( cornerKey WLight WLight WDouble WNone, "╡" )
+        , ( cornerKey WLight WNone WNone WDouble, "╘" )
+        , ( cornerKey WLight WNone WDouble WDouble, "╧" )
+        , ( cornerKey WLight WNone WDouble WNone, "╛" )
 
         -- Double vertical, Light horizontal
-        , ( cornerKey WNone WDouble WNone WLight, "\u{2553}" )
-        , ( cornerKey WNone WDouble WLight WLight, "\u{2565}" )
-        , ( cornerKey WNone WDouble WLight WNone, "\u{2556}" )
-        , ( cornerKey WDouble WDouble WNone WLight, "\u{255F}" )
-        , ( cornerKey WDouble WDouble WLight WLight, "\u{256B}" )
-        , ( cornerKey WDouble WDouble WLight WNone, "\u{2562}" )
-        , ( cornerKey WDouble WNone WNone WLight, "\u{2559}" )
-        , ( cornerKey WDouble WNone WLight WLight, "\u{2568}" )
-        , ( cornerKey WDouble WNone WLight WNone, "\u{255C}" )
+        , ( cornerKey WNone WDouble WNone WLight, "╓" )
+        , ( cornerKey WNone WDouble WLight WLight, "╥" )
+        , ( cornerKey WNone WDouble WLight WNone, "╖" )
+        , ( cornerKey WDouble WDouble WNone WLight, "╟" )
+        , ( cornerKey WDouble WDouble WLight WLight, "╫" )
+        , ( cornerKey WDouble WDouble WLight WNone, "╢" )
+        , ( cornerKey WDouble WNone WNone WLight, "╙" )
+        , ( cornerKey WDouble WNone WLight WLight, "╨" )
+        , ( cornerKey WDouble WNone WLight WNone, "╜" )
 
         -- Mixed: Light down, Heavy up (and vice versa) with Light horizontal
-        , ( cornerKey WLight WHeavy WNone WLight, "\u{251F}" )
-        , ( cornerKey WLight WHeavy WLight WLight, "\u{2541}" )
-        , ( cornerKey WLight WHeavy WLight WNone, "\u{2527}" )
-        , ( cornerKey WHeavy WLight WNone WLight, "\u{251E}" )
-        , ( cornerKey WHeavy WLight WLight WLight, "\u{2540}" )
-        , ( cornerKey WHeavy WLight WLight WNone, "\u{2526}" )
+        , ( cornerKey WLight WHeavy WNone WLight, "┟" )
+        , ( cornerKey WLight WHeavy WLight WLight, "╁" )
+        , ( cornerKey WLight WHeavy WLight WNone, "┧" )
+        , ( cornerKey WHeavy WLight WNone WLight, "┞" )
+        , ( cornerKey WHeavy WLight WLight WLight, "╀" )
+        , ( cornerKey WHeavy WLight WLight WNone, "┦" )
 
         -- Mixed: Light down, Heavy up with Heavy horizontal
-        , ( cornerKey WLight WHeavy WNone WHeavy, "\u{2522}" )
-        , ( cornerKey WLight WHeavy WHeavy WHeavy, "\u{254A}" )
-        , ( cornerKey WLight WHeavy WHeavy WNone, "\u{252A}" )
-        , ( cornerKey WHeavy WLight WNone WHeavy, "\u{2521}" )
-        , ( cornerKey WHeavy WLight WHeavy WHeavy, "\u{2549}" )
-        , ( cornerKey WHeavy WLight WHeavy WNone, "\u{2529}" )
+        , ( cornerKey WLight WHeavy WNone WHeavy, "┢" )
+        , ( cornerKey WLight WHeavy WHeavy WHeavy, "╊" )
+        , ( cornerKey WLight WHeavy WHeavy WNone, "┪" )
+        , ( cornerKey WHeavy WLight WNone WHeavy, "┡" )
+        , ( cornerKey WHeavy WLight WHeavy WHeavy, "╉" )
+        , ( cornerKey WHeavy WLight WHeavy WNone, "┩" )
 
         -- Mixed horizontal: Light left, Heavy right (and vice versa) with Light vertical
-        , ( cornerKey WNone WLight WLight WHeavy, "\u{252D}" )
-        , ( cornerKey WNone WLight WHeavy WLight, "\u{252E}" )
-        , ( cornerKey WLight WLight WLight WHeavy, "\u{253D}" )
-        , ( cornerKey WLight WLight WHeavy WLight, "\u{253E}" )
-        , ( cornerKey WLight WNone WLight WHeavy, "\u{2535}" )
-        , ( cornerKey WLight WNone WHeavy WLight, "\u{2536}" )
+        , ( cornerKey WNone WLight WLight WHeavy, "┭" )
+        , ( cornerKey WNone WLight WHeavy WLight, "┮" )
+        , ( cornerKey WLight WLight WLight WHeavy, "┽" )
+        , ( cornerKey WLight WLight WHeavy WLight, "┾" )
+        , ( cornerKey WLight WNone WLight WHeavy, "┵" )
+        , ( cornerKey WLight WNone WHeavy WLight, "┶" )
 
         -- Mixed horizontal: Light left, Heavy right with Heavy vertical
-        , ( cornerKey WNone WHeavy WLight WHeavy, "\u{2531}" )
-        , ( cornerKey WNone WHeavy WHeavy WLight, "\u{2532}" )
-        , ( cornerKey WHeavy WHeavy WLight WHeavy, "\u{2545}" )
-        , ( cornerKey WHeavy WHeavy WHeavy WLight, "\u{2546}" )
-        , ( cornerKey WHeavy WNone WLight WHeavy, "\u{2539}" )
-        , ( cornerKey WHeavy WNone WHeavy WLight, "\u{253A}" )
+        , ( cornerKey WNone WHeavy WLight WHeavy, "┱" )
+        , ( cornerKey WNone WHeavy WHeavy WLight, "┲" )
+        , ( cornerKey WHeavy WHeavy WLight WHeavy, "╅" )
+        , ( cornerKey WHeavy WHeavy WHeavy WLight, "╆" )
+        , ( cornerKey WHeavy WNone WLight WHeavy, "┹" )
+        , ( cornerKey WHeavy WNone WHeavy WLight, "┺" )
 
         -- All four different: vertical mixed + horizontal mixed
-        , ( cornerKey WLight WHeavy WLight WHeavy, "\u{2543}" )
-        , ( cornerKey WLight WHeavy WHeavy WLight, "\u{2544}" )
-        , ( cornerKey WHeavy WLight WLight WHeavy, "\u{2547}" )
-        , ( cornerKey WHeavy WLight WHeavy WLight, "\u{2548}" )
+        , ( cornerKey WLight WHeavy WLight WHeavy, "╃" )
+        , ( cornerKey WLight WHeavy WHeavy WLight, "╄" )
+        , ( cornerKey WHeavy WLight WLight WHeavy, "╇" )
+        , ( cornerKey WHeavy WLight WHeavy WLight, "╈" )
         ]
 
 
@@ -1308,6 +1316,7 @@ view model =
     { title = "Tabular"
     , body =
         [ globalStyles
+        , copyButtonComponent
         , div [ Attr.class "app" ]
             [ viewHeader
             , viewTableEditor model
@@ -1782,6 +1791,16 @@ body {
         ]
 
 
+copyButtonComponent : Html msg
+copyButtonComponent =
+    node "img"
+        [ Attr.src "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+        , Attr.attribute "onload" "if(!customElements.get('copy-button')){customElements.define('copy-button',class extends HTMLElement{connectedCallback(){if(this.querySelector('button'))return;var b=document.createElement('button');b.className='copy-btn';b.textContent='Copy';var self=this;b.onclick=function(){var el=document.getElementById(self.getAttribute('target'));if(el)navigator.clipboard.writeText(el.value).then(function(){b.textContent='Copied!';setTimeout(function(){b.textContent='Copy'},1500)})};this.appendChild(b)}})}"
+        , Attr.style "display" "none"
+        ]
+        []
+
+
 viewHeader : Html msg
 viewHeader =
     div [ Attr.class "header" ]
@@ -1814,12 +1833,13 @@ viewTableEditor model =
                                 delTd =
                                     td [ Attr.style "text-align" "center" ]
                                         [ button
-                                            [ Attr.class "del-col-btn"
+                                            [ Attr.id ("del-col-" ++ String.fromInt c)
+                                            , Attr.class "del-col-btn"
                                             , Attr.title ("Remove column " ++ String.fromInt (c + 1))
                                             , onClick (RemoveColumn c)
                                             , Attr.disabled (not canDeleteCol)
                                             ]
-                                            [ text "\u{00D7}" ]
+                                            [ text "×" ]
                                         ]
                             in
                             if c < model.cols - 1 then
@@ -1843,7 +1863,8 @@ viewTableEditor model =
 
                                 alignBtn align label =
                                     button
-                                        [ Attr.class
+                                        [ Attr.id ("align-" ++ String.fromInt c ++ "-" ++ String.toLower label)
+                                        , Attr.class
                                             (if currentAlign == align then
                                                 "align-btn active"
 
@@ -1923,7 +1944,7 @@ viewTableEditor model =
                                 , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " (set all)")
                                 , onClick (CycleHorizontalLineStyle hIdx)
                                 ]
-                                [ text "\u{2194}" ]
+                                [ text "↔" ]
                             ]
                        ]
                 )
@@ -1937,7 +1958,8 @@ viewTableEditor model =
                                 cellTd =
                                     td []
                                         [ input
-                                            [ Attr.class
+                                            [ Attr.id ("cell-" ++ String.fromInt r ++ "-" ++ String.fromInt c)
+                                            , Attr.class
                                                 (if r == 0 then
                                                     "cell-input header-cell"
 
@@ -1981,7 +2003,7 @@ viewTableEditor model =
                                         ]
                                         [ text
                                             (if effectiveStyle == None then
-                                                "\u{00D8}"
+                                                "Ø"
 
                                              else
                                                 verticalChar effectiveStyle
@@ -1996,12 +2018,13 @@ viewTableEditor model =
                         colRange
                     ++ [ td [ Attr.style "vertical-align" "middle" ]
                             [ button
-                                [ Attr.class "del-row-btn"
+                                [ Attr.id ("del-row-" ++ String.fromInt r)
+                                , Attr.class "del-row-btn"
                                 , Attr.title ("Remove row " ++ String.fromInt (r + 1))
                                 , onClick (RemoveRow r)
                                 , Attr.disabled (not canDeleteRow)
                                 ]
-                                [ text "\u{00D7}" ]
+                                [ text "×" ]
                             ]
                        ]
                 )
@@ -2039,7 +2062,7 @@ viewTableEditor model =
                             ]
                             [ text
                                 (if style == None then
-                                    "\u{00D8}"
+                                    "Ø"
 
                                  else
                                     verticalChar style
@@ -2050,10 +2073,11 @@ viewTableEditor model =
                 )
     in
     div [ Attr.class "table-container" ]
-        ([ if model.showImport then
+        [ if model.showImport then
             div [ Attr.class "import-section" ]
                 [ textarea
-                    [ Attr.class "import-textarea"
+                    [ Attr.id "import-textarea"
+                    , Attr.class "import-textarea"
                     , Attr.placeholder "Paste from Excel, Google Sheets, or CSV..."
                     , Attr.value model.importText
                     , onInput ImportTextChanged
@@ -2062,29 +2086,30 @@ viewTableEditor model =
                     []
                 , div [ Attr.class "import-actions" ]
                     [ button
-                        [ Attr.class "add-btn"
+                        [ Attr.id "import-btn"
+                        , Attr.class "add-btn"
                         , onClick ImportData
                         , Attr.disabled (String.isEmpty (String.trim model.importText))
                         ]
                         [ text "Import" ]
-                    , button [ Attr.class "add-btn", onClick ToggleImport ]
+                    , button [ Attr.id "import-cancel", Attr.class "add-btn", onClick ToggleImport ]
                         [ text "Cancel" ]
                     ]
                 ]
 
-           else
+          else
             text ""
-         , table [ Attr.class "editor-table" ]
+        , table [ Attr.class "editor-table" ]
             [ thead [] [ deleteColHeaderRow, alignmentRow ]
             , tbody [] bodyRows
             ]
-         , verticalSepControls
-         , div [ Attr.class "button-row" ]
-            [ button [ Attr.class "add-btn", onClick AddRow ]
+        , verticalSepControls
+        , div [ Attr.class "button-row" ]
+            [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
                 [ text "+ Row" ]
-            , button [ Attr.class "add-btn", onClick AddColumn ]
+            , button [ Attr.id "add-column", Attr.class "add-btn", onClick AddColumn ]
                 [ text "+ Column" ]
-            , button [ Attr.class "add-btn", onClick ToggleImport ]
+            , button [ Attr.id "toggle-import", Attr.class "add-btn", onClick ToggleImport ]
                 [ text
                     (if model.showImport then
                         "Hide Import"
@@ -2094,8 +2119,7 @@ viewTableEditor model =
                     )
                 ]
             ]
-         ]
-        )
+        ]
 
 
 viewMarkdownOutput : Model -> Html FrontendMsg
@@ -2109,7 +2133,8 @@ viewMarkdownOutput model =
             [ span [ Attr.class "output-title" ] [ text "Markdown" ]
             , div [ Attr.class "output-controls" ]
                 [ button
-                    [ Attr.class
+                    [ Attr.id "format-compact"
+                    , Attr.class
                         (if model.outputFormat == Compact then
                             "format-btn active"
 
@@ -2120,7 +2145,8 @@ viewMarkdownOutput model =
                     ]
                     [ text "Compact" ]
                 , button
-                    [ Attr.class
+                    [ Attr.id "format-expanded"
+                    , Attr.class
                         (if model.outputFormat == Expanded then
                             "format-btn active"
 
@@ -2130,12 +2156,7 @@ viewMarkdownOutput model =
                     , onClick (SetOutputFormat Expanded)
                     ]
                     [ text "Expanded" ]
-                , button
-                    [ Attr.class "copy-btn"
-                    , Attr.attribute "onclick"
-                        "var btn=this;navigator.clipboard.writeText(document.getElementById('md-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
-                    ]
-                    [ text "Copy" ]
+                , Html.node "copy-button" [ Attr.attribute "target" "md-output" ] []
                 ]
             ]
         , textarea
@@ -2242,12 +2263,7 @@ viewHtmlTableOutput model =
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]
             [ span [ Attr.class "output-title" ] [ text "HTML Table" ]
-            , button
-                [ Attr.class "copy-btn"
-                , Attr.attribute "onclick"
-                    "var btn=this;navigator.clipboard.writeText(document.getElementById('html-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
-                ]
-                [ text "Copy" ]
+            , Html.node "copy-button" [ Attr.attribute "target" "html-output" ] []
             ]
         , textarea
             [ Attr.class "output-textarea"
@@ -2269,12 +2285,7 @@ viewBoxDrawingOutput model =
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]
             [ span [ Attr.class "output-title" ] [ text "Box Drawing" ]
-            , button
-                [ Attr.class "copy-btn"
-                , Attr.attribute "onclick"
-                    "var btn=this;navigator.clipboard.writeText(document.getElementById('box-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
-                ]
-                [ text "Copy" ]
+            , Html.node "copy-button" [ Attr.attribute "target" "box-output" ] []
             ]
         , textarea
             [ Attr.class "output-textarea box-textarea"
