@@ -19,6 +19,7 @@ type alias FrontendModel =
     , outputFormat : OutputFormat
     , showImport : Bool
     , importText : String
+    , collapsedSections : List OutputSection
     }
 
 
@@ -53,6 +54,13 @@ type OutputFormat
     | Expanded
 
 
+type OutputSection
+    = BoxDrawingSection
+    | MarkdownSection
+    | PreviewSection
+    | HtmlSection
+
+
 type alias BackendModel =
     { message : String
     }
@@ -75,6 +83,7 @@ type FrontendMsg
     | CycleVerticalLineStyle Int
     | CycleCellHorizontalStyle Int Int
     | CycleCellVerticalStyle Int Int
+    | ToggleSection OutputSection
 
 
 type ToBackend

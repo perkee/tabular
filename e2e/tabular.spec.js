@@ -165,3 +165,28 @@ test('import cancel hides the import panel', async ({ page }) => {
   await page.locator('#import-cancel').click();
   await expect(page.locator('#import-textarea')).toHaveCount(0);
 });
+
+// --- Collapsible sections ---
+
+test('clicking output section header collapses and expands its content', async ({ page }) => {
+  // Box Drawing section should be visible initially
+  await expect(page.locator('#box-output')).toHaveCount(1);
+
+  // Click the Box Drawing header to collapse
+  await page.locator('.output-section .output-header .output-title', { hasText: 'Box Drawing' }).click();
+  await expect(page.locator('#box-output')).toHaveCount(0);
+
+  // Click again to expand
+  await page.locator('.output-section .output-header .output-title', { hasText: 'Box Drawing' }).click();
+  await expect(page.locator('#box-output')).toHaveCount(1);
+});
+
+test('collapsing one section does not affect others', async ({ page }) => {
+  // Collapse Markdown
+  await page.locator('.output-section .output-header .output-title', { hasText: 'Markdown' }).click();
+  await expect(page.locator('#md-output')).toHaveCount(0);
+
+  // Box Drawing and HTML should still be visible
+  await expect(page.locator('#box-output')).toHaveCount(1);
+  await expect(page.locator('#html-output')).toHaveCount(1);
+});

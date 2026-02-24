@@ -54,6 +54,7 @@ init _ key =
       , outputFormat = Expanded
       , showImport = False
       , importText = ""
+      , collapsedSections = []
       }
     , Command.none
     )
@@ -204,6 +205,17 @@ update msg model =
             ( { model | cellVerticalStyles = Dict.insert ( row, vIdx ) (cycleLineStyle current) model.cellVerticalStyles }
             , Command.none
             )
+
+        ToggleSection section ->
+            let
+                newSections =
+                    if List.member section model.collapsedSections then
+                        List.filter (\s -> s /= section) model.collapsedSections
+
+                    else
+                        section :: model.collapsedSections
+            in
+            ( { model | collapsedSections = newSections }, Command.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -1783,6 +1795,34 @@ body {
 .box-textarea {
     line-height: 1.0;
 }
+
+.output-header.collapsed {
+    margin-bottom: 0;
+}
+
+.section-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    font-family: inherit;
+    line-height: inherit;
+}
+
+.section-chevron {
+    display: inline-block;
+    margin-right: 0.4em;
+    font-size: 0.75rem;
+    transition: transform 0.15s;
+}
+
+.section-chevron.collapsed {
+    transform: rotate(-90deg);
+}
 """
         ]
 
@@ -2111,12 +2151,35 @@ viewTableEditor model =
 viewMarkdownOutput : Model -> Html FrontendMsg
 viewMarkdownOutput model =
     let
+        collapsed =
+            List.member MarkdownSection model.collapsedSections
+
         markdown =
             generateMarkdown model.outputFormat model.rows model.cols model.cells model.alignments
     in
     div [ Attr.class "output-section" ]
-        [ div [ Attr.class "output-header" ]
-            [ span [ Attr.class "output-title" ] [ text "Markdown" ]
+        (div
+            [ Attr.class
+                (if collapsed then
+                    "output-header collapsed"
+
+                 else
+                    "output-header"
+                )
+            ]
+            [ button [ Attr.class "output-title section-toggle", onClick (ToggleSection MarkdownSection) ]
+                [ span
+                    [ Attr.class
+                        (if collapsed then
+                            "section-chevron collapsed"
+
+                         else
+                            "section-chevron"
+                        )
+                    ]
+                    [ text "▼" ]
+                , text "Markdown"
+                ]
             , div [ Attr.class "output-controls" ]
                 [ button
                     [ Attr.id "format-compact"
@@ -2145,15 +2208,21 @@ viewMarkdownOutput model =
                 , Html.node "copy-button" [ Attr.attribute "target" "md-output" ] []
                 ]
             ]
-        , textarea
-            [ Attr.class "output-textarea"
-            , Attr.id "md-output"
-            , Attr.readonly True
-            , Attr.value markdown
-            , Attr.rows (max 4 (model.rows + 2))
-            ]
-            []
-        ]
+            :: (if collapsed then
+                    []
+
+                else
+                    [ textarea
+                        [ Attr.class "output-textarea"
+                        , Attr.id "md-output"
+                        , Attr.readonly True
+                        , Attr.value markdown
+                        , Attr.rows (max 4 (model.rows + 2))
+                        ]
+                        []
+                    ]
+               )
+        )
 
 
 viewRenderedTable : Model -> Html FrontendMsg
@@ -2226,59 +2295,146 @@ viewRenderedTable model =
                         )
                 )
                 (List.range 1 (model.rows - 1))
+
+        collapsed =
+            List.member PreviewSection model.collapsedSections
     in
     div [ Attr.class "output-section" ]
-        [ div [ Attr.class "output-header" ]
-            [ span [ Attr.class "output-title" ] [ text "Preview" ]
+        (div
+            [ Attr.class
+                (if collapsed then
+                    "output-header collapsed"
+
+                 else
+                    "output-header"
+                )
             ]
-        , div [ Attr.class "rendered-table-wrapper" ]
-            [ table [ Attr.class "rendered-table" ]
-                [ thead [] [ headerRow ]
-                , tbody [] bodyRows
+            [ button [ Attr.class "output-title section-toggle", onClick (ToggleSection PreviewSection) ]
+                [ span
+                    [ Attr.class
+                        (if collapsed then
+                            "section-chevron collapsed"
+
+                         else
+                            "section-chevron"
+                        )
+                    ]
+                    [ text "▼" ]
+                , text "Preview"
                 ]
             ]
-        ]
+            :: (if collapsed then
+                    []
+
+                else
+                    [ div [ Attr.class "rendered-table-wrapper" ]
+                        [ table [ Attr.class "rendered-table" ]
+                            [ thead [] [ headerRow ]
+                            , tbody [] bodyRows
+                            ]
+                        ]
+                    ]
+               )
+        )
 
 
 viewHtmlTableOutput : Model -> Html FrontendMsg
 viewHtmlTableOutput model =
     let
+        collapsed =
+            List.member HtmlSection model.collapsedSections
+
         htmlTable =
             generateHtmlTable model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
     in
     div [ Attr.class "output-section" ]
-        [ div [ Attr.class "output-header" ]
-            [ span [ Attr.class "output-title" ] [ text "HTML Table" ]
+        (div
+            [ Attr.class
+                (if collapsed then
+                    "output-header collapsed"
+
+                 else
+                    "output-header"
+                )
+            ]
+            [ button [ Attr.class "output-title section-toggle", onClick (ToggleSection HtmlSection) ]
+                [ span
+                    [ Attr.class
+                        (if collapsed then
+                            "section-chevron collapsed"
+
+                         else
+                            "section-chevron"
+                        )
+                    ]
+                    [ text "▼" ]
+                , text "HTML Table"
+                ]
             , Html.node "copy-button" [ Attr.attribute "target" "html-output" ] []
             ]
-        , textarea
-            [ Attr.class "output-textarea"
-            , Attr.id "html-output"
-            , Attr.readonly True
-            , Attr.value htmlTable
-            , Attr.rows (max 4 (model.rows + 6))
-            ]
-            []
-        ]
+            :: (if collapsed then
+                    []
+
+                else
+                    [ textarea
+                        [ Attr.class "output-textarea"
+                        , Attr.id "html-output"
+                        , Attr.readonly True
+                        , Attr.value htmlTable
+                        , Attr.rows (max 4 (model.rows + 6))
+                        ]
+                        []
+                    ]
+               )
+        )
 
 
 viewBoxDrawingOutput : Model -> Html FrontendMsg
 viewBoxDrawingOutput model =
     let
+        collapsed =
+            List.member BoxDrawingSection model.collapsedSections
+
         boxDrawing =
             generateBoxDrawing model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
     in
     div [ Attr.class "output-section" ]
-        [ div [ Attr.class "output-header" ]
-            [ span [ Attr.class "output-title" ] [ text "Box Drawing" ]
+        (div
+            [ Attr.class
+                (if collapsed then
+                    "output-header collapsed"
+
+                 else
+                    "output-header"
+                )
+            ]
+            [ button [ Attr.class "output-title section-toggle", onClick (ToggleSection BoxDrawingSection) ]
+                [ span
+                    [ Attr.class
+                        (if collapsed then
+                            "section-chevron collapsed"
+
+                         else
+                            "section-chevron"
+                        )
+                    ]
+                    [ text "▼" ]
+                , text "Box Drawing"
+                ]
             , Html.node "copy-button" [ Attr.attribute "target" "box-output" ] []
             ]
-        , textarea
-            [ Attr.class "output-textarea box-textarea"
-            , Attr.id "box-output"
-            , Attr.readonly True
-            , Attr.value boxDrawing
-            , Attr.rows (max 4 (model.rows * 2 + 1))
-            ]
-            []
-        ]
+            :: (if collapsed then
+                    []
+
+                else
+                    [ textarea
+                        [ Attr.class "output-textarea box-textarea"
+                        , Attr.id "box-output"
+                        , Attr.readonly True
+                        , Attr.value boxDrawing
+                        , Attr.rows (max 4 (model.rows * 2 + 1))
+                        ]
+                        []
+                    ]
+               )
+        )
