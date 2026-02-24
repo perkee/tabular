@@ -1297,10 +1297,10 @@ view model =
         , div [ Attr.class "app" ]
             [ viewHeader
             , viewTableEditor model
+            , viewBoxDrawingOutput model
             , viewMarkdownOutput model
             , viewRenderedTable model
             , viewHtmlTableOutput model
-            , viewBoxDrawingOutput model
             ]
         ]
     }
