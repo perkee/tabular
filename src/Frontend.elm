@@ -573,6 +573,7 @@ view model =
             [ viewHeader
             , viewTableEditor model
             , viewMarkdownOutput model
+            , viewRenderedTable model
             , viewHtmlTableOutput model
             , viewBoxDrawingOutput model
             ]
@@ -845,6 +846,37 @@ body {
     box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.3);
 }
 
+.rendered-table-wrapper {
+    overflow-x: auto;
+}
+
+.rendered-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.rendered-table th,
+.rendered-table td {
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+}
+
+.rendered-table thead th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #d1d5db;
+}
+
+.rendered-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.rendered-table tbody tr:hover {
+    background: #f0f4ff;
+}
+
 .import-section {
     margin-bottom: 1rem;
     padding: 1rem;
@@ -1095,6 +1127,50 @@ viewMarkdownOutput model =
             , Attr.rows (max 4 (model.rows + 2))
             ]
             []
+        ]
+
+
+viewRenderedTable : Model -> Html FrontendMsg
+viewRenderedTable model =
+    let
+        colRange =
+            List.range 0 (model.cols - 1)
+
+        alignStyle col =
+            Attr.style "text-align" (alignmentToStyle (getAlignment col model.alignments))
+
+        headerRow =
+            tr []
+                (List.map
+                    (\c ->
+                        th [ alignStyle c ] [ text (getCell 0 c model.cells) ]
+                    )
+                    colRange
+                )
+
+        bodyRows =
+            List.map
+                (\r ->
+                    tr []
+                        (List.map
+                            (\c ->
+                                td [ alignStyle c ] [ text (getCell r c model.cells) ]
+                            )
+                            colRange
+                        )
+                )
+                (List.range 1 (model.rows - 1))
+    in
+    div [ Attr.class "output-section" ]
+        [ div [ Attr.class "output-header" ]
+            [ span [ Attr.class "output-title" ] [ text "Preview" ]
+            ]
+        , div [ Attr.class "rendered-table-wrapper" ]
+            [ table [ Attr.class "rendered-table" ]
+                [ thead [] [ headerRow ]
+                , tbody [] bodyRows
+                ]
+            ]
         ]
 
 
