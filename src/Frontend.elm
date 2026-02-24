@@ -41,6 +41,8 @@ init _ key =
       , alignments = Dict.empty
       , horizontalLineStyles = Dict.empty
       , verticalLineStyles = Dict.empty
+      , cellHorizontalStyles = Dict.empty
+      , cellVerticalStyles = Dict.empty
       , outputFormat = Expanded
       , showImport = False
       , importText = ""
@@ -80,6 +82,8 @@ update msg model =
                     | rows = model.rows - 1
                     , cells = removeRow rowIndex model.cells
                     , horizontalLineStyles = removeIndexFromDict (rowIndex + 1) model.horizontalLineStyles
+                    , cellHorizontalStyles = removeCellStyleRow rowIndex model.cellHorizontalStyles
+                    , cellVerticalStyles = removeCellVStyleRow rowIndex model.cellVerticalStyles
                   }
                 , Cmd.none
                 )
@@ -94,6 +98,8 @@ update msg model =
                     , cells = removeColumn colIndex model.cells
                     , alignments = removeColumnAlignments colIndex model.alignments
                     , verticalLineStyles = removeIndexFromDict (colIndex + 1) model.verticalLineStyles
+                    , cellHorizontalStyles = removeCellStyleCol colIndex model.cellHorizontalStyles
+                    , cellVerticalStyles = removeCellVStyleCol colIndex model.cellVerticalStyles
                   }
                 , Cmd.none
                 )
@@ -130,6 +136,8 @@ update msg model =
                     , alignments = Dict.empty
                     , horizontalLineStyles = Dict.empty
                     , verticalLineStyles = Dict.empty
+                    , cellHorizontalStyles = Dict.empty
+                    , cellVerticalStyles = Dict.empty
                     , showImport = False
                     , importText = ""
                   }
@@ -143,8 +151,15 @@ update msg model =
             let
                 current =
                     getHorizontalLineStyle idx model.horizontalLineStyles
+
+                clearedCellStyles =
+                    model.cellHorizontalStyles
+                        |> Dict.filter (\( h, _ ) _ -> h /= idx)
             in
-            ( { model | horizontalLineStyles = Dict.insert idx (cycleLineStyle current) model.horizontalLineStyles }
+            ( { model
+                | horizontalLineStyles = Dict.insert idx (cycleLineStyle current) model.horizontalLineStyles
+                , cellHorizontalStyles = clearedCellStyles
+              }
             , Cmd.none
             )
 
@@ -152,8 +167,33 @@ update msg model =
             let
                 current =
                     getVerticalLineStyle idx model.verticalLineStyles
+
+                clearedCellStyles =
+                    model.cellVerticalStyles
+                        |> Dict.filter (\( _, v ) _ -> v /= idx)
             in
-            ( { model | verticalLineStyles = Dict.insert idx (cycleLineStyle current) model.verticalLineStyles }
+            ( { model
+                | verticalLineStyles = Dict.insert idx (cycleLineStyle current) model.verticalLineStyles
+                , cellVerticalStyles = clearedCellStyles
+              }
+            , Cmd.none
+            )
+
+        CycleCellHorizontalStyle hIdx col ->
+            let
+                current =
+                    getEffectiveHStyle hIdx col model.cellHorizontalStyles model.horizontalLineStyles
+            in
+            ( { model | cellHorizontalStyles = Dict.insert ( hIdx, col ) (cycleLineStyle current) model.cellHorizontalStyles }
+            , Cmd.none
+            )
+
+        CycleCellVerticalStyle row vIdx ->
+            let
+                current =
+                    getEffectiveVStyle row vIdx model.cellVerticalStyles model.verticalLineStyles
+            in
+            ( { model | cellVerticalStyles = Dict.insert ( row, vIdx ) (cycleLineStyle current) model.cellVerticalStyles }
             , Cmd.none
             )
 
@@ -254,6 +294,78 @@ removeIndexFromDict idx dict =
         |> Dict.fromList
 
 
+removeCellStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellStyleRow rowIdx dict =
+    dict
+        |> Dict.toList
+        |> List.filterMap
+            (\( ( h, c ), v ) ->
+                if h == rowIdx || h == rowIdx + 1 then
+                    Nothing
+
+                else if h > rowIdx + 1 then
+                    Just ( ( h - 1, c ), v )
+
+                else
+                    Just ( ( h, c ), v )
+            )
+        |> Dict.fromList
+
+
+removeCellVStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellVStyleRow rowIdx dict =
+    dict
+        |> Dict.toList
+        |> List.filterMap
+            (\( ( r, vi ), v ) ->
+                if r == rowIdx then
+                    Nothing
+
+                else if r > rowIdx then
+                    Just ( ( r - 1, vi ), v )
+
+                else
+                    Just ( ( r, vi ), v )
+            )
+        |> Dict.fromList
+
+
+removeCellStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellStyleCol colIdx dict =
+    dict
+        |> Dict.toList
+        |> List.filterMap
+            (\( ( h, c ), v ) ->
+                if c == colIdx then
+                    Nothing
+
+                else if c > colIdx then
+                    Just ( ( h, c - 1 ), v )
+
+                else
+                    Just ( ( h, c ), v )
+            )
+        |> Dict.fromList
+
+
+removeCellVStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellVStyleCol colIdx dict =
+    dict
+        |> Dict.toList
+        |> List.filterMap
+            (\( ( r, vi ), v ) ->
+                if vi == colIdx || vi == colIdx + 1 then
+                    Nothing
+
+                else if vi > colIdx + 1 then
+                    Just ( ( r, vi - 1 ), v )
+
+                else
+                    Just ( ( r, vi ), v )
+            )
+        |> Dict.fromList
+
+
 getHorizontalLineStyle : Int -> Dict Int LineStyle -> LineStyle
 getHorizontalLineStyle idx styles =
     Dict.get idx styles |> Maybe.withDefault Thin
@@ -262,6 +374,26 @@ getHorizontalLineStyle idx styles =
 getVerticalLineStyle : Int -> Dict Int LineStyle -> LineStyle
 getVerticalLineStyle idx styles =
     Dict.get idx styles |> Maybe.withDefault Thin
+
+
+getEffectiveHStyle : Int -> Int -> Dict ( Int, Int ) LineStyle -> Dict Int LineStyle -> LineStyle
+getEffectiveHStyle hIdx col cellStyles rowStyles =
+    case Dict.get ( hIdx, col ) cellStyles of
+        Just s ->
+            s
+
+        Nothing ->
+            getHorizontalLineStyle hIdx rowStyles
+
+
+getEffectiveVStyle : Int -> Int -> Dict ( Int, Int ) LineStyle -> Dict Int LineStyle -> LineStyle
+getEffectiveVStyle row vIdx cellStyles colStyles =
+    case Dict.get ( row, vIdx ) cellStyles of
+        Just s ->
+            s
+
+        Nothing ->
+            getVerticalLineStyle vIdx colStyles
 
 
 cycleLineStyle : LineStyle -> LineStyle
@@ -822,8 +954,8 @@ generateMarkdown format rows cols cells alignments =
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> String
-generateBoxDrawing rows cols cells alignments hStyles vStyles =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
+generateBoxDrawing rows cols cells alignments hStyles vStyles cellHStyles cellVStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -845,48 +977,17 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles =
                     )
                     colRange
 
-            hStyle hIdx =
-                getHorizontalLineStyle hIdx hStyles
+            effH hIdx col =
+                getEffectiveHStyle hIdx col cellHStyles hStyles
 
-            vStyle vIdx =
-                getVerticalLineStyle vIdx vStyles
-
-            hWeight hIdx =
-                lineStyleWeight (hStyle hIdx)
-
-            vWeight vIdx =
-                lineStyleWeight (vStyle vIdx)
+            effV row vIdx =
+                getEffectiveVStyle row vIdx cellVStyles vStyles
 
             horizontalLine hIdx =
                 let
-                    hChar =
-                        horizontalChar (hStyle hIdx)
-
-                    upW =
-                        if hIdx == 0 then
-                            WNone
-
-                        else
-                            hWeight (hIdx - 1)
-
-                    downW =
-                        if hIdx == rows then
-                            WNone
-
-                        else
-                            hWeight hIdx
-
-                    -- Actually up/down come from vertical separators, left/right from horizontal
-                    -- Wait - re-reading the plan: up/down come from vertical separator at that column position
-                    -- left/right come from horizontal separator at the current row position
-                    -- Let me reconsider: at intersection (hIdx, vIdx):
-                    --   up = vertical separator vIdx, from row above = if hIdx > 0 then vWeight vIdx else WNone
-                    --   down = vertical separator vIdx, from row below = if hIdx < rows then vWeight vIdx else WNone
-                    --   left = horizontal separator hIdx, from col to left = if vIdx > 0 then hWeight hIdx else WNone
-                    --   right = horizontal separator hIdx, from col to right = if vIdx < cols then hWeight hIdx else WNone
                     segments =
                         List.map2
-                            (\c w -> String.repeat (w + 2) hChar)
+                            (\c w -> String.repeat (w + 2) (horizontalChar (effH hIdx c)))
                             colRange
                             colWidths
 
@@ -896,23 +997,23 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles =
                                 let
                                     up =
                                         if hIdx > 0 then
-                                            vWeight vIdx
+                                            lineStyleWeight (effV (hIdx - 1) vIdx)
 
                                         else
                                             WNone
 
                                     down =
                                         if hIdx < rows then
-                                            vWeight vIdx
+                                            lineStyleWeight (effV hIdx vIdx)
 
                                         else
                                             WNone
 
                                     left =
-                                        hWeight hIdx
+                                        lineStyleWeight (effH hIdx (vIdx - 1))
 
                                     right =
-                                        hWeight hIdx
+                                        lineStyleWeight (effH hIdx vIdx)
                                 in
                                 lookupCorner up down left right
                             )
@@ -922,47 +1023,47 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles =
                         let
                             up =
                                 if hIdx > 0 then
-                                    vWeight 0
+                                    lineStyleWeight (effV (hIdx - 1) 0)
 
                                 else
                                     WNone
 
                             down =
                                 if hIdx < rows then
-                                    vWeight 0
+                                    lineStyleWeight (effV hIdx 0)
 
                                 else
                                     WNone
                         in
-                        lookupCorner up down WNone (hWeight hIdx)
+                        lookupCorner up down WNone (lineStyleWeight (effH hIdx 0))
 
                     rightCorner =
                         let
                             up =
                                 if hIdx > 0 then
-                                    vWeight cols
+                                    lineStyleWeight (effV (hIdx - 1) cols)
 
                                 else
                                     WNone
 
                             down =
                                 if hIdx < rows then
-                                    vWeight cols
+                                    lineStyleWeight (effV hIdx cols)
 
                                 else
                                     WNone
                         in
-                        lookupCorner up down (hWeight hIdx) WNone
+                        lookupCorner up down (lineStyleWeight (effH hIdx (cols - 1))) WNone
                 in
                 leftCorner ++ String.join "" (interleave segments intersections) ++ rightCorner
 
             formatRow r =
                 let
                     leftV =
-                        verticalChar (vStyle 0)
+                        verticalChar (effV r 0)
 
                     rightV =
-                        verticalChar (vStyle cols)
+                        verticalChar (effV r cols)
 
                     cellTexts =
                         List.map2
@@ -976,7 +1077,7 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles =
 
                     innerSeps =
                         List.map
-                            (\vIdx -> verticalChar (vStyle vIdx))
+                            (\vIdx -> verticalChar (effV r vIdx))
                             (List.range 1 (cols - 1))
                 in
                 leftV ++ " " ++ String.join "" (interleave (List.map (\t -> t) cellTexts) (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
@@ -1026,8 +1127,8 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> String
-generateHtmlTable rows cols cells alignments hStyles vStyles =
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
+generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1049,16 +1150,16 @@ generateHtmlTable rows cols cells alignments hStyles vStyles =
             cellBorderStyle r c =
                 let
                     top =
-                        getHorizontalLineStyle r hStyles
+                        getEffectiveHStyle r c cellHStyles hStyles
 
                     bottom =
-                        getHorizontalLineStyle (r + 1) hStyles
+                        getEffectiveHStyle (r + 1) c cellHStyles hStyles
 
                     left =
-                        getVerticalLineStyle c vStyles
+                        getEffectiveVStyle r c cellVStyles vStyles
 
                     right =
-                        getVerticalLineStyle (c + 1) vStyles
+                        getEffectiveVStyle r (c + 1) cellVStyles vStyles
 
                     parts =
                         List.filterMap identity
@@ -1569,6 +1670,58 @@ body {
     background: #f0f4ff;
     border-color: #4a90d9;
 }
+
+.vsep-cell {
+    width: 18px;
+    min-width: 18px;
+    max-width: 18px;
+    padding: 0 !important;
+    text-align: center;
+}
+
+.vsep-inline-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 100%;
+    min-height: 32px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    color: #4a90d9;
+    transition: background 0.15s;
+    margin: 0 auto;
+    padding: 0;
+    line-height: 1;
+}
+
+.vsep-inline-btn:hover {
+    background: #f0f4ff;
+}
+
+.hsep-setall-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 12px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 10px;
+    color: #9ca3af;
+    transition: all 0.15s;
+    padding: 0;
+    line-height: 1;
+}
+
+.hsep-setall-btn:hover {
+    color: #4a90d9;
+    background: #f0f4ff;
+}
 """
         ]
 
@@ -1599,17 +1752,25 @@ viewTableEditor model =
         deleteColHeaderRow =
             tr []
                 (td [] []
-                    :: List.map
+                    :: List.concatMap
                         (\c ->
-                            td [ Attr.style "text-align" "center" ]
-                                [ button
-                                    [ Attr.class "del-col-btn"
-                                    , Attr.title ("Remove column " ++ String.fromInt (c + 1))
-                                    , onClick (RemoveColumn c)
-                                    , Attr.disabled (not canDeleteCol)
-                                    ]
-                                    [ text "\u{00D7}" ]
-                                ]
+                            let
+                                delTd =
+                                    td [ Attr.style "text-align" "center" ]
+                                        [ button
+                                            [ Attr.class "del-col-btn"
+                                            , Attr.title ("Remove column " ++ String.fromInt (c + 1))
+                                            , onClick (RemoveColumn c)
+                                            , Attr.disabled (not canDeleteCol)
+                                            ]
+                                            [ text "\u{00D7}" ]
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ delTd, td [ Attr.class "vsep-cell" ] [] ]
+
+                            else
+                                [ delTd ]
                         )
                         colRange
                     ++ [ td [] [] ]
@@ -1618,7 +1779,7 @@ viewTableEditor model =
         alignmentRow =
             tr []
                 (td [] []
-                    :: List.map
+                    :: List.concatMap
                         (\c ->
                             let
                                 currentAlign =
@@ -1637,14 +1798,21 @@ viewTableEditor model =
                                         , Attr.title label
                                         ]
                                         [ text label ]
+
+                                alignTd =
+                                    td [ Attr.style "text-align" "center" ]
+                                        [ div [ Attr.class "align-group" ]
+                                            [ alignBtn AlignLeft "L"
+                                            , alignBtn AlignCenter "C"
+                                            , alignBtn AlignRight "R"
+                                            ]
+                                        ]
                             in
-                            td [ Attr.style "text-align" "center" ]
-                                [ div [ Attr.class "align-group" ]
-                                    [ alignBtn AlignLeft "L"
-                                    , alignBtn AlignCenter "C"
-                                    , alignBtn AlignRight "R"
-                                    ]
-                                ]
+                            if c < model.cols - 1 then
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
+
+                            else
+                                [ alignTd ]
                         )
                         colRange
                     ++ [ td [] [] ]
@@ -1652,51 +1820,97 @@ viewTableEditor model =
 
         hSepRow hIdx =
             tr [ Attr.class "hsep-row" ]
-                [ td
-                    [ Attr.attribute "colspan" (String.fromInt (model.cols + 2))
-                    , Attr.style "padding" "0"
-                    ]
-                    [ button
-                        [ Attr.class "hsep-btn"
-                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles))
-                        , onClick (CycleHorizontalLineStyle hIdx)
-                        ]
-                        [ div
-                            [ Attr.class "hsep-indicator"
-                            , Attr.style "border-top" (lineStyleToCss (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " #4a90d9")
+                (td [ Attr.style "padding" "0" ] []
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                effectiveStyle =
+                                    getEffectiveHStyle hIdx c model.cellHorizontalStyles model.horizontalLineStyles
+
+                                segmentTd =
+                                    td [ Attr.style "padding" "0" ]
+                                        [ button
+                                            [ Attr.class "hsep-btn"
+                                            , Attr.title (hSepLabel hIdx model.rows ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
+                                            , onClick (CycleCellHorizontalStyle hIdx c)
+                                            ]
+                                            [ div
+                                                [ Attr.class "hsep-indicator"
+                                                , Attr.style "border-top" (lineStyleToCss effectiveStyle ++ " #4a90d9")
+                                                ]
+                                                []
+                                            ]
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ segmentTd, td [ Attr.class "vsep-cell", Attr.style "padding" "0" ] [] ]
+
+                            else
+                                [ segmentTd ]
+                        )
+                        colRange
+                    ++ [ td [ Attr.style "padding" "0" ]
+                            [ button
+                                [ Attr.class "hsep-setall-btn"
+                                , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " (set all)")
+                                , onClick (CycleHorizontalLineStyle hIdx)
+                                ]
+                                [ text "\u{2194}" ]
                             ]
-                            []
-                        ]
-                    ]
-                ]
+                       ]
+                )
 
         dataRow r =
             tr []
                 (td [] []
-                    :: List.map
+                    :: List.concatMap
                         (\c ->
-                            td []
-                                [ input
-                                    [ Attr.class
-                                        (if r == 0 then
-                                            "cell-input header-cell"
+                            let
+                                cellTd =
+                                    td []
+                                        [ input
+                                            [ Attr.class
+                                                (if r == 0 then
+                                                    "cell-input header-cell"
 
-                                         else
-                                            "cell-input"
-                                        )
-                                    , Attr.value (getCell r c model.cells)
-                                    , Attr.placeholder
-                                        (if r == 0 then
-                                            "Header " ++ String.fromInt (c + 1)
+                                                 else
+                                                    "cell-input"
+                                                )
+                                            , Attr.value (getCell r c model.cells)
+                                            , Attr.placeholder
+                                                (if r == 0 then
+                                                    "Header " ++ String.fromInt (c + 1)
 
-                                         else
-                                            ""
-                                        )
-                                    , Attr.spellcheck False
-                                    , onInput (CellChanged r c)
+                                                 else
+                                                    ""
+                                                )
+                                            , Attr.spellcheck False
+                                            , onInput (CellChanged r c)
+                                            ]
+                                            []
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                let
+                                    vIdx =
+                                        c + 1
+
+                                    effectiveStyle =
+                                        getEffectiveVStyle r vIdx model.cellVerticalStyles model.verticalLineStyles
+                                in
+                                [ cellTd
+                                , td [ Attr.class "vsep-cell" ]
+                                    [ button
+                                        [ Attr.class "vsep-inline-btn"
+                                        , Attr.title (vSepLabel vIdx model.cols ++ " row " ++ String.fromInt (r + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
+                                        , onClick (CycleCellVerticalStyle r vIdx)
+                                        ]
+                                        [ text (verticalChar effectiveStyle) ]
                                     ]
-                                    []
                                 ]
+
+                            else
+                                [ cellTd ]
                         )
                         colRange
                     ++ [ td [ Attr.style "vertical-align" "middle" ]
@@ -1849,16 +2063,16 @@ viewRenderedTable model =
                     getAlignment c model.alignments
 
                 top =
-                    getHorizontalLineStyle r model.horizontalLineStyles
+                    getEffectiveHStyle r c model.cellHorizontalStyles model.horizontalLineStyles
 
                 bottom =
-                    getHorizontalLineStyle (r + 1) model.horizontalLineStyles
+                    getEffectiveHStyle (r + 1) c model.cellHorizontalStyles model.horizontalLineStyles
 
                 left =
-                    getVerticalLineStyle c model.verticalLineStyles
+                    getEffectiveVStyle r c model.cellVerticalStyles model.verticalLineStyles
 
                 right =
-                    getVerticalLineStyle (c + 1) model.verticalLineStyles
+                    getEffectiveVStyle r (c + 1) model.cellVerticalStyles model.verticalLineStyles
 
                 borderAttrs =
                     List.filterMap identity
@@ -1925,7 +2139,7 @@ viewHtmlTableOutput : Model -> Html FrontendMsg
 viewHtmlTableOutput model =
     let
         htmlTable =
-            generateHtmlTable model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles
+            generateHtmlTable model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]
@@ -1952,7 +2166,7 @@ viewBoxDrawingOutput : Model -> Html FrontendMsg
 viewBoxDrawingOutput model =
     let
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles
+            generateBoxDrawing model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
     in
     div [ Attr.class "output-section" ]
         [ div [ Attr.class "output-header" ]

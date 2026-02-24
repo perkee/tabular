@@ -14,6 +14,8 @@ type alias FrontendModel =
     , alignments : Dict Int Alignment
     , horizontalLineStyles : Dict Int LineStyle
     , verticalLineStyles : Dict Int LineStyle
+    , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
+    , cellVerticalStyles : Dict ( Int, Int ) LineStyle
     , outputFormat : OutputFormat
     , showImport : Bool
     , importText : String
@@ -70,6 +72,8 @@ type FrontendMsg
     | ImportData
     | CycleHorizontalLineStyle Int
     | CycleVerticalLineStyle Int
+    | CycleCellHorizontalStyle Int Int
+    | CycleCellVerticalStyle Int Int
     | NoOpFrontendMsg
 
 
