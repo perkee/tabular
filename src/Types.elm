@@ -29,7 +29,8 @@ type Alignment
 
 
 type LineStyle
-    = Thin
+    = None
+    | Thin
     | Thick
     | ThinTripleDash
     | ThickTripleDash

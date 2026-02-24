@@ -399,6 +399,9 @@ getEffectiveVStyle row vIdx cellStyles colStyles =
 cycleLineStyle : LineStyle -> LineStyle
 cycleLineStyle style =
     case style of
+        None ->
+            Thin
+
         Thin ->
             Thick
 
@@ -424,12 +427,15 @@ cycleLineStyle style =
             Double
 
         Double ->
-            Thin
+            None
 
 
 lineStyleWeight : LineStyle -> LineWeight
 lineStyleWeight style =
     case style of
+        None ->
+            WNone
+
         Thin ->
             WLight
 
@@ -461,6 +467,9 @@ lineStyleWeight style =
 horizontalChar : LineStyle -> String
 horizontalChar style =
     case style of
+        None ->
+            " "
+
         Thin ->
             "\u{2500}"
 
@@ -492,6 +501,9 @@ horizontalChar style =
 verticalChar : LineStyle -> String
 verticalChar style =
     case style of
+        None ->
+            " "
+
         Thin ->
             "\u{2502}"
 
@@ -543,28 +555,39 @@ cornerKey up down left right =
 
 lookupCorner : LineWeight -> LineWeight -> LineWeight -> LineWeight -> String
 lookupCorner up down left right =
-    let
-        key =
-            cornerKey up down left right
-    in
-    case Dict.get key cornerDict of
-        Just ch ->
-            ch
+    if up == WNone && down == WNone && left == WNone && right == WNone then
+        " "
 
-        Nothing ->
-            -- Fallback: downgrade Heavy to Light when mixing with Double
-            let
-                fix w =
-                    if w == WHeavy then
-                        WLight
+    else
+        let
+            key =
+                cornerKey up down left right
+        in
+        case Dict.get key cornerDict of
+            Just ch ->
+                ch
 
-                    else
-                        w
+            Nothing ->
+                -- Fallback: downgrade Heavy to Light when mixing with Double
+                let
+                    fix w =
+                        if w == WHeavy then
+                            WLight
 
-                fallbackKey =
-                    cornerKey (fix up) (fix down) (fix left) (fix right)
-            in
-            Dict.get fallbackKey cornerDict |> Maybe.withDefault "\u{253C}"
+                        else
+                            w
+
+                    fallbackKey =
+                        cornerKey (fix up) (fix down) (fix left) (fix right)
+                in
+                -- Try with WNone->WNone preserved (for partial None borders)
+                case Dict.get fallbackKey cornerDict of
+                    Just ch ->
+                        ch
+
+                    Nothing ->
+                        -- Last resort: treat WNone as absent
+                        " "
 
 
 cornerDict : Dict Int String
@@ -690,6 +713,9 @@ cornerDict =
 lineStyleLabel : LineStyle -> String
 lineStyleLabel style =
     case style of
+        None ->
+            "None"
+
         Thin ->
             "Thin"
 
@@ -745,6 +771,9 @@ vSepLabel idx cols =
 lineStyleToCss : LineStyle -> String
 lineStyleToCss style =
     case style of
+        None ->
+            "none"
+
         Thin ->
             "1px solid"
 
@@ -1722,6 +1751,15 @@ body {
     color: #4a90d9;
     background: #f0f4ff;
 }
+
+.vsep-none {
+    color: #d0d0d0 !important;
+    font-size: 11px !important;
+}
+
+.hsep-none {
+    opacity: 0.5;
+}
 """
         ]
 
@@ -1830,13 +1868,25 @@ viewTableEditor model =
                                 segmentTd =
                                     td [ Attr.style "padding" "0" ]
                                         [ button
-                                            [ Attr.class "hsep-btn"
+                                            [ Attr.class
+                                                (if effectiveStyle == None then
+                                                    "hsep-btn hsep-none"
+
+                                                 else
+                                                    "hsep-btn"
+                                                )
                                             , Attr.title (hSepLabel hIdx model.rows ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
                                             , onClick (CycleCellHorizontalStyle hIdx c)
                                             ]
                                             [ div
                                                 [ Attr.class "hsep-indicator"
-                                                , Attr.style "border-top" (lineStyleToCss effectiveStyle ++ " #4a90d9")
+                                                , Attr.style "border-top"
+                                                    (if effectiveStyle == None then
+                                                        "1px dotted #d0d0d0"
+
+                                                     else
+                                                        lineStyleToCss effectiveStyle ++ " #4a90d9"
+                                                    )
                                                 ]
                                                 []
                                             ]
@@ -1901,11 +1951,24 @@ viewTableEditor model =
                                 [ cellTd
                                 , td [ Attr.class "vsep-cell" ]
                                     [ button
-                                        [ Attr.class "vsep-inline-btn"
+                                        [ Attr.class
+                                            (if effectiveStyle == None then
+                                                "vsep-inline-btn vsep-none"
+
+                                             else
+                                                "vsep-inline-btn"
+                                            )
                                         , Attr.title (vSepLabel vIdx model.cols ++ " row " ++ String.fromInt (r + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
                                         , onClick (CycleCellVerticalStyle r vIdx)
                                         ]
-                                        [ text (verticalChar effectiveStyle) ]
+                                        [ text
+                                            (if effectiveStyle == None then
+                                                "\u{00D8}"
+
+                                             else
+                                                verticalChar effectiveStyle
+                                            )
+                                        ]
                                     ]
                                 ]
 
@@ -1941,12 +2004,29 @@ viewTableEditor model =
             div [ Attr.class "vsep-controls" ]
                 (List.map
                     (\vIdx ->
+                        let
+                            style =
+                                getVerticalLineStyle vIdx model.verticalLineStyles
+                        in
                         button
-                            [ Attr.class "vsep-btn"
-                            , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel (getVerticalLineStyle vIdx model.verticalLineStyles))
+                            [ Attr.class
+                                (if style == None then
+                                    "vsep-btn vsep-none"
+
+                                 else
+                                    "vsep-btn"
+                                )
+                            , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel style)
                             , onClick (CycleVerticalLineStyle vIdx)
                             ]
-                            [ text (verticalChar (getVerticalLineStyle vIdx model.verticalLineStyles)) ]
+                            [ text
+                                (if style == None then
+                                    "\u{00D8}"
+
+                                 else
+                                    verticalChar style
+                                )
+                            ]
                     )
                     (List.range 0 model.cols)
                 )
