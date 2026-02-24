@@ -18,6 +18,7 @@ config =
     , NoUnused.CustomTypeConstructorArgs.rule
         |> Review.Rule.ignoreErrorsForFiles [ "src/Types.elm" ]
     , NoUnused.Dependencies.rule
+        |> Review.Rule.ignoreErrorsForFiles [ "elm.json" ]
     , NoUnused.Parameters.rule
     , NoUnused.Patterns.rule
     , Simplify.rule Simplify.defaults
