@@ -462,6 +462,105 @@ generateBoxDrawing rows cols cells alignments =
 
 
 
+-- HTML TABLE GENERATION
+
+
+alignmentToStyle : Alignment -> String
+alignmentToStyle align =
+    case align of
+        AlignLeft ->
+            "left"
+
+        AlignCenter ->
+            "center"
+
+        AlignRight ->
+            "right"
+
+
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> String
+generateHtmlTable rows cols cells alignments =
+    if rows == 0 || cols == 0 then
+        ""
+
+    else
+        let
+            colRange =
+                List.range 0 (cols - 1)
+
+            indent n =
+                String.repeat n "  "
+
+            escapeHtml s =
+                s
+                    |> String.replace "&" "&amp;"
+                    |> String.replace "<" "&lt;"
+                    |> String.replace ">" "&gt;"
+                    |> String.replace "\"" "&quot;"
+
+            headerCells =
+                List.map
+                    (\c ->
+                        let
+                            align =
+                                getAlignment c alignments
+
+                            style =
+                                if align /= AlignLeft then
+                                    " style=\"text-align: " ++ alignmentToStyle align ++ "\""
+
+                                else
+                                    ""
+                        in
+                        indent 3 ++ "<th" ++ style ++ ">" ++ escapeHtml (getCell 0 c cells) ++ "</th>"
+                    )
+                    colRange
+
+            headerSection =
+                [ indent 1 ++ "<thead>"
+                , indent 2 ++ "<tr>"
+                ]
+                    ++ headerCells
+                    ++ [ indent 2 ++ "</tr>"
+                       , indent 1 ++ "</thead>"
+                       ]
+
+            bodyRow r =
+                let
+                    rowCells =
+                        List.map
+                            (\c ->
+                                let
+                                    align =
+                                        getAlignment c alignments
+
+                                    style =
+                                        if align /= AlignLeft then
+                                            " style=\"text-align: " ++ alignmentToStyle align ++ "\""
+
+                                        else
+                                            ""
+                                in
+                                indent 3 ++ "<td" ++ style ++ ">" ++ escapeHtml (getCell r c cells) ++ "</td>"
+                            )
+                            colRange
+                in
+                [ indent 2 ++ "<tr>" ] ++ rowCells ++ [ indent 2 ++ "</tr>" ]
+
+            bodyRows =
+                List.concatMap bodyRow (List.range 1 (rows - 1))
+
+            bodySection =
+                if rows > 1 then
+                    [ indent 1 ++ "<tbody>" ] ++ bodyRows ++ [ indent 1 ++ "</tbody>" ]
+
+                else
+                    []
+        in
+        String.join "\n" ([ "<table>" ] ++ headerSection ++ bodySection ++ [ "</table>" ])
+
+
+
 -- VIEW
 
 
@@ -474,6 +573,7 @@ view model =
             [ viewHeader
             , viewTableEditor model
             , viewMarkdownOutput model
+            , viewHtmlTableOutput model
             , viewBoxDrawingOutput model
             ]
         ]
@@ -993,6 +1093,33 @@ viewMarkdownOutput model =
             , Attr.readonly True
             , Attr.value markdown
             , Attr.rows (max 4 (model.rows + 2))
+            ]
+            []
+        ]
+
+
+viewHtmlTableOutput : Model -> Html FrontendMsg
+viewHtmlTableOutput model =
+    let
+        htmlTable =
+            generateHtmlTable model.rows model.cols model.cells model.alignments
+    in
+    div [ Attr.class "output-section" ]
+        [ div [ Attr.class "output-header" ]
+            [ span [ Attr.class "output-title" ] [ text "HTML Table" ]
+            , button
+                [ Attr.class "copy-btn"
+                , Attr.attribute "onclick"
+                    "var btn=this;navigator.clipboard.writeText(document.getElementById('html-output').value).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})"
+                ]
+                [ text "Copy" ]
+            ]
+        , textarea
+            [ Attr.class "output-textarea"
+            , Attr.id "html-output"
+            , Attr.readonly True
+            , Attr.value htmlTable
+            , Attr.rows (max 4 (model.rows + 6))
             ]
             []
         ]
