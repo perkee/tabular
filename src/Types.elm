@@ -1,7 +1,6 @@
 module Types exposing (..)
 
 import Browser
-import Browser.Navigation
 import Dict exposing (Dict)
 import Effect.Browser.Navigation
 import Url exposing (Url)
@@ -76,7 +75,6 @@ type FrontendMsg
     | CycleVerticalLineStyle Int
     | CycleCellHorizontalStyle Int Int
     | CycleCellVerticalStyle Int Int
-    | NoOpFrontendMsg
 
 
 type ToBackend

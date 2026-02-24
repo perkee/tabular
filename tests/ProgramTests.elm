@@ -2,7 +2,6 @@ module ProgramTests exposing (suite)
 
 import Backend
 import Effect.Browser.Dom as Dom
-import Effect.Http exposing (Response(..))
 import Effect.Lamdera
 import Effect.Test exposing (FileUpload(..), HttpResponse(..), MultipleFilesUpload(..))
 import Effect.Time

@@ -5,7 +5,7 @@ import Dict exposing (Dict)
 import Effect.Browser.Navigation as Nav
 import Effect.Command as Command exposing (Command, FrontendOnly)
 import Effect.Lamdera
-import Effect.Subscription as Subscription exposing (Subscription)
+import Effect.Subscription as Subscription
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
@@ -204,9 +204,6 @@ update msg model =
             ( { model | cellVerticalStyles = Dict.insert ( row, vIdx ) (cycleLineStyle current) model.cellVerticalStyles }
             , Command.none
             )
-
-        NoOpFrontendMsg ->
-            ( model, Command.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -1106,7 +1103,7 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles cellHStyles cellVS
                         in
                         lookupCorner up down (lineStyleWeight (effH hIdx (cols - 1))) WNone
                 in
-                leftCorner ++ String.join "" (interleave segments intersections) ++ rightCorner
+                leftCorner ++ String.concat (interleave segments intersections) ++ rightCorner
 
             formatRow r =
                 let
@@ -1131,7 +1128,7 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles cellHStyles cellVS
                             (\vIdx -> verticalChar (effV r vIdx))
                             (List.range 1 (cols - 1))
                 in
-                leftV ++ " " ++ String.join "" (interleave (List.map (\t -> t) cellTexts) (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
+                leftV ++ " " ++ String.concat (interleave cellTexts (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
 
             allRows =
                 List.concatMap
@@ -1154,7 +1151,7 @@ interleave a b =
         ( [], _ ) ->
             []
 
-        ( x :: xs, [] ) ->
+        ( x :: _, [] ) ->
             [ x ]
 
         ( x :: xs, y :: ys ) ->
@@ -1292,19 +1289,19 @@ generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVSt
                             )
                             colRange
                 in
-                [ indent 2 ++ "<tr>" ] ++ rowCells ++ [ indent 2 ++ "</tr>" ]
+                (indent 2 ++ "<tr>") :: rowCells ++ [ indent 2 ++ "</tr>" ]
 
             bodyRows =
                 List.concatMap bodyRow (List.range 1 (rows - 1))
 
             bodySection =
                 if rows > 1 then
-                    [ indent 1 ++ "<tbody>" ] ++ bodyRows ++ [ indent 1 ++ "</tbody>" ]
+                    (indent 1 ++ "<tbody>") :: bodyRows ++ [ indent 1 ++ "</tbody>" ]
 
                 else
                     []
         in
-        String.join "\n" ([ "<table>" ] ++ headerSection ++ bodySection ++ [ "</table>" ])
+        String.join "\n" ("<table>" :: headerSection ++ bodySection ++ [ "</table>" ])
 
 
 

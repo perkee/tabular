@@ -2,7 +2,7 @@ module Backend exposing (..)
 
 import Effect.Command as Command exposing (BackendOnly, Command)
 import Effect.Lamdera exposing (ClientId, SessionId)
-import Effect.Subscription as Subscription exposing (Subscription)
+import Effect.Subscription as Subscription
 import Lamdera
 import Types exposing (..)
 
@@ -41,7 +41,7 @@ update msg model =
 
 
 updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
-updateFromFrontend sessionId clientId msg model =
+updateFromFrontend _ _ msg model =
     case msg of
         NoOpToBackend ->
             ( model, Command.none )

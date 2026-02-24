@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "lamdera make src/Frontend.elm --output=/dev/null",
+    "test": "elm-test --compiler lamdera",
+    "review": "npx elm-review",
+    "check": "npm run build && npm run test && npm run review"
+  }
+}
