@@ -13,6 +13,8 @@ type alias FrontendModel =
     , cells : Dict ( Int, Int ) String
     , alignments : Dict Int Alignment
     , outputFormat : OutputFormat
+    , showImport : Bool
+    , importText : String
     }
 
 
@@ -42,6 +44,9 @@ type FrontendMsg
     | RemoveColumn Int
     | SetOutputFormat OutputFormat
     | SetAlignment Int Alignment
+    | ToggleImport
+    | ImportTextChanged String
+    | ImportData
     | NoOpFrontendMsg
 
 

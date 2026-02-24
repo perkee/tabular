@@ -40,6 +40,8 @@ init _ key =
                 ]
       , alignments = Dict.empty
       , outputFormat = Expanded
+      , showImport = False
+      , importText = ""
       }
     , Cmd.none
     )
@@ -102,6 +104,34 @@ update msg model =
             ( { model | alignments = Dict.insert col alignment model.alignments }
             , Cmd.none
             )
+
+        ToggleImport ->
+            ( { model | showImport = not model.showImport, importText = "" }
+            , Cmd.none
+            )
+
+        ImportTextChanged value ->
+            ( { model | importText = value }, Cmd.none )
+
+        ImportData ->
+            let
+                parsed =
+                    parseImportData model.importText
+            in
+            if parsed.rows > 0 && parsed.cols > 0 then
+                ( { model
+                    | rows = parsed.rows
+                    , cols = parsed.cols
+                    , cells = parsed.cells
+                    , alignments = Dict.empty
+                    , showImport = False
+                    , importText = ""
+                  }
+                , Cmd.none
+                )
+
+            else
+                ( model, Cmd.none )
 
         NoOpFrontendMsg ->
             ( model, Cmd.none )
@@ -218,6 +248,51 @@ padContent align content width =
 escapePipe : String -> String
 escapePipe s =
     String.replace "|" "\\|" s
+
+
+
+-- IMPORT PARSING
+
+
+parseImportData : String -> { rows : Int, cols : Int, cells : Dict ( Int, Int ) String }
+parseImportData input =
+    let
+        trimmed =
+            String.trim input
+
+        lines =
+            if String.isEmpty trimmed then
+                []
+
+            else
+                String.split "\n" trimmed
+
+        delimiter =
+            if List.any (String.contains "\t") lines then
+                "\t"
+
+            else
+                ","
+
+        parsedRows =
+            List.map (String.split delimiter >> List.map String.trim) lines
+
+        numRows =
+            List.length parsedRows
+
+        numCols =
+            List.foldl (\row maxC -> max maxC (List.length row)) 0 parsedRows
+
+        cells =
+            parsedRows
+                |> List.indexedMap
+                    (\r row ->
+                        List.indexedMap (\c val -> ( ( r, c ), val )) row
+                    )
+                |> List.concat
+                |> Dict.fromList
+    in
+    { rows = numRows, cols = numCols, cells = cells }
 
 
 
@@ -669,6 +744,39 @@ body {
 .output-textarea:focus {
     box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.3);
 }
+
+.import-section {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+}
+
+.import-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    background: white;
+}
+
+.import-textarea:focus {
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.12);
+}
+
+.import-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
 """
         ]
 
@@ -792,17 +900,51 @@ viewTableEditor model =
                 )
     in
     div [ Attr.class "table-container" ]
-        [ table [ Attr.class "editor-table" ]
+        ([ if model.showImport then
+            div [ Attr.class "import-section" ]
+                [ textarea
+                    [ Attr.class "import-textarea"
+                    , Attr.placeholder "Paste from Excel, Google Sheets, or CSV..."
+                    , Attr.value model.importText
+                    , onInput ImportTextChanged
+                    , Attr.rows 6
+                    ]
+                    []
+                , div [ Attr.class "import-actions" ]
+                    [ button
+                        [ Attr.class "add-btn"
+                        , onClick ImportData
+                        , Attr.disabled (String.isEmpty (String.trim model.importText))
+                        ]
+                        [ text "Import" ]
+                    , button [ Attr.class "add-btn", onClick ToggleImport ]
+                        [ text "Cancel" ]
+                    ]
+                ]
+
+           else
+            text ""
+         , table [ Attr.class "editor-table" ]
             [ thead [] [ deleteColHeaderRow, alignmentRow ]
             , tbody [] (List.map dataRow rowRange)
             ]
-        , div [ Attr.class "button-row" ]
+         , div [ Attr.class "button-row" ]
             [ button [ Attr.class "add-btn", onClick AddRow ]
                 [ text "+ Row" ]
             , button [ Attr.class "add-btn", onClick AddColumn ]
                 [ text "+ Column" ]
+            , button [ Attr.class "add-btn", onClick ToggleImport ]
+                [ text
+                    (if model.showImport then
+                        "Hide Import"
+
+                     else
+                        "Import Data"
+                    )
+                ]
             ]
-        ]
+         ]
+        )
 
 
 viewMarkdownOutput : Model -> Html FrontendMsg
