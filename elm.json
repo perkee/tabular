@@ -14,6 +14,7 @@
             "lamdera/codecs": "1.0.0",
             "lamdera/core": "1.0.0",
             "lamdera/program-test": "3.0.0",
+            "elm/svg": "1.0.1",
             "rtfeldman/elm-sorter-experiment": "2.1.2"
         },
         "indirect": {
@@ -23,7 +24,6 @@
             "elm/json": "1.1.4",
             "elm/parser": "1.1.0",
             "elm/random": "1.0.0",
-            "elm/svg": "1.0.1",
             "elm/time": "1.0.0",
             "elm/virtual-dom": "1.0.5",
             "elm-explorations/linear-algebra": "1.0.3",

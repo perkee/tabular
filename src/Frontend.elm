@@ -9,6 +9,8 @@ import Effect.Subscription as Subscription
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
+import Svg
+import Svg.Attributes as SvgAttr
 import Lamdera
 import Types exposing (..)
 import Url
@@ -1317,6 +1319,49 @@ generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVSt
 
 
 
+-- ICONS
+
+
+alignLeftIcon : Html msg
+alignLeftIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        ]
+        [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "7", SvgAttr.x2 "9", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "11", SvgAttr.x2 "11", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+alignCenterIcon : Html msg
+alignCenterIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        ]
+        [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "3", SvgAttr.y1 "7", SvgAttr.x2 "11", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "11", SvgAttr.x2 "12", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+alignRightIcon : Html msg
+alignRightIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        ]
+        [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "5", SvgAttr.y1 "7", SvgAttr.x2 "13", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "3", SvgAttr.y1 "11", SvgAttr.x2 "13", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+
 -- VIEW
 
 
@@ -1463,7 +1508,7 @@ body {
 }
 
 .align-btn {
-    padding: 3px 8px;
+    padding: 4px 6px;
     border: none;
     border-right: 1px solid #e5e7eb;
     background: white;
@@ -1474,6 +1519,10 @@ body {
     font-weight: 600;
     transition: all 0.15s;
     line-height: 1.2;
+}
+
+.align-btn svg {
+    display: block;
 }
 
 .align-btn:last-child {
@@ -1694,21 +1743,6 @@ body {
     height: 0;
 }
 
-.vsep-controls {
-    display: flex;
-    gap: 4px;
-    margin-top: 8px;
-    align-items: center;
-    padding-left: 2px;
-}
-
-.vsep-controls::before {
-    content: 'Vertical:';
-    font-size: 11px;
-    color: #6b7280;
-    margin-right: 4px;
-}
-
 .vsep-btn {
     width: 28px;
     height: 28px;
@@ -1771,8 +1805,9 @@ body {
     border: none;
     background: transparent;
     cursor: pointer;
-    font-size: 10px;
-    color: #9ca3af;
+    font-size: 14px;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    color: #4a90d9;
     transition: all 0.15s;
     padding: 0;
     line-height: 1;
@@ -1880,16 +1915,16 @@ viewTableEditor model =
 
         alignmentRow =
             tr []
-                (td [] []
+                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
                     :: List.concatMap
                         (\c ->
                             let
                                 currentAlign =
                                     getAlignment c model.alignments
 
-                                alignBtn align label =
+                                alignBtn align idSuffix label icon =
                                     button
-                                        [ Attr.id ("align-" ++ String.fromInt c ++ "-" ++ String.toLower label)
+                                        [ Attr.id ("align-" ++ String.fromInt c ++ "-" ++ idSuffix)
                                         , Attr.class
                                             (if currentAlign == align then
                                                 "align-btn active"
@@ -1900,30 +1935,54 @@ viewTableEditor model =
                                         , onClick (SetAlignment c align)
                                         , Attr.title label
                                         ]
-                                        [ text label ]
+                                        [ icon ]
 
                                 alignTd =
                                     td [ Attr.style "text-align" "center" ]
                                         [ div [ Attr.class "align-group" ]
-                                            [ alignBtn AlignLeft "L"
-                                            , alignBtn AlignCenter "C"
-                                            , alignBtn AlignRight "R"
+                                            [ alignBtn AlignLeft "l" "Left" alignLeftIcon
+                                            , alignBtn AlignCenter "c" "Center" alignCenterIcon
+                                            , alignBtn AlignRight "r" "Right" alignRightIcon
                                             ]
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [] [] ]
+                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
                 )
 
         hSepRow hIdx =
+            let
+                rowStyle =
+                    getHorizontalLineStyle hIdx model.horizontalLineStyles
+            in
             tr [ Attr.class "hsep-row" ]
-                (td [ Attr.style "padding" "0" ] []
+                (td [ Attr.style "padding" "0" ]
+                    [ button
+                        [ Attr.class
+                            (if rowStyle == None then
+                                "hsep-setall-btn hsep-none"
+
+                             else
+                                "hsep-setall-btn"
+                            )
+                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel rowStyle ++ " (set all)")
+                        , onClick (CycleHorizontalLineStyle hIdx)
+                        ]
+                        [ text
+                            (if rowStyle == None then
+                                "Ø"
+
+                             else
+                                horizontalChar rowStyle
+                            )
+                        ]
+                    ]
                     :: List.concatMap
                         (\c ->
                             let
@@ -1964,15 +2023,7 @@ viewTableEditor model =
                                 [ segmentTd ]
                         )
                         colRange
-                    ++ [ td [ Attr.style "padding" "0" ]
-                            [ button
-                                [ Attr.class "hsep-setall-btn"
-                                , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel (getHorizontalLineStyle hIdx model.horizontalLineStyles) ++ " (set all)")
-                                , onClick (CycleHorizontalLineStyle hIdx)
-                                ]
-                                [ text "↔" ]
-                            ]
-                       ]
+                    ++ [ td [ Attr.style "padding" "0" ] [] ]
                 )
 
         dataRow r =
@@ -2067,36 +2118,31 @@ viewTableEditor model =
                 rowRange
                 ++ [ hSepRow model.rows ]
 
-        verticalSepControls =
-            div [ Attr.class "vsep-controls" ]
-                (List.map
-                    (\vIdx ->
-                        let
-                            style =
-                                getVerticalLineStyle vIdx model.verticalLineStyles
-                        in
-                        button
-                            [ Attr.class
-                                (if style == None then
-                                    "vsep-btn vsep-none"
+        vsepButton vIdx =
+            let
+                style =
+                    getVerticalLineStyle vIdx model.verticalLineStyles
+            in
+            button
+                [ Attr.class
+                    (if style == None then
+                        "vsep-btn vsep-none"
 
-                                 else
-                                    "vsep-btn"
-                                )
-                            , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel style)
-                            , onClick (CycleVerticalLineStyle vIdx)
-                            ]
-                            [ text
-                                (if style == None then
-                                    "Ø"
-
-                                 else
-                                    verticalChar style
-                                )
-                            ]
+                     else
+                        "vsep-btn"
                     )
-                    (List.range 0 model.cols)
-                )
+                , Attr.title (vSepLabel vIdx model.cols ++ ": " ++ lineStyleLabel style)
+                , onClick (CycleVerticalLineStyle vIdx)
+                ]
+                [ text
+                    (if style == None then
+                        "Ø"
+
+                     else
+                        verticalChar style
+                    )
+                ]
+
     in
     div [ Attr.class "table-container" ]
         [ if model.showImport then
@@ -2129,7 +2175,6 @@ viewTableEditor model =
             [ thead [] [ deleteColHeaderRow, alignmentRow ]
             , tbody [] bodyRows
             ]
-        , verticalSepControls
         , div [ Attr.class "button-row" ]
             [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
                 [ text "+ Row" ]

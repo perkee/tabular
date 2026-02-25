@@ -2,7 +2,7 @@
 
 ## Git Workflow
 - Implement features on feature branches, not directly on main
-- Merge to main via pull requests using `gh pr create`
+- Merge to main via pull requests using `npm run create-pr -- --title "..." --body "..."` (auto-generates a screenshot)
 
 ## Custom Types Over Primitives
 - Use custom types (tagged unions) wherever possible
