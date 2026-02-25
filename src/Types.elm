@@ -3,6 +3,7 @@ module Types exposing (..)
 import Browser
 import Dict exposing (Dict)
 import Effect.Browser.Navigation
+import SeqSet exposing (SeqSet)
 import Url exposing (Url)
 
 
@@ -19,7 +20,7 @@ type alias FrontendModel =
     , outputFormat : OutputFormat
     , showImport : Bool
     , importText : String
-    , collapsedSections : List OutputSection
+    , collapsedSections : SeqSet OutputSection
     }
 
 

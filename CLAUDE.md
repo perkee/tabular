@@ -7,8 +7,8 @@
 ## Custom Types Over Primitives
 - Use custom types (tagged unions) wherever possible
 - Strings, integers, and booleans should only be used for things that cannot be represented otherwise
-- For Sets/Dicts keyed by custom types, prefer `rtfeldman/elm-sorter-experiment` (`Sort.Set`, `Sort.Dict`)
-- Caveat: `Sort.Set`/`Sort.Dict` store functions internally, so Lamdera cannot serialize them in the model. Use `List` for small collections of custom types in the model instead.
+- For Sets/Dicts keyed by custom types, prefer `lamdera/containers` (`SeqSet`, `SeqDict`) — these are Lamdera-serializable
+- Avoid `rtfeldman/elm-sorter-experiment` (`Sort.Set`/`Sort.Dict`) in the model — they store functions internally, which Lamdera cannot serialize
 
 ## Accessibility (WCAG)
 - Interactive elements must be `<button>` unless they navigate to a URL (then `<a>`)
