@@ -65,7 +65,9 @@ jobs:
         run: npm run review
 
       - name: Lamdera check
-        run: lamdera check
+        run: |
+          echo "${{ secrets.LAMDERA_TOKEN }}" > ~/.elm/.lamdera-cli
+          lamdera check
 
   deploy:
     needs: check
