@@ -40,6 +40,13 @@ jobs:
           curl -sSL https://static.lamdera.com/bin/lamdera-1.3.0-linux-x86_64 -o /usr/local/bin/lamdera
           chmod +x /usr/local/bin/lamdera
 
+      - name: Set up SSH for Lamdera
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LAMDERA_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 apps.lamdera.com >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Install dependencies
         run: npm ci
 
@@ -52,24 +59,18 @@ jobs:
       - name: Review
         run: npm run review
 
-  e2e:
+      - name: Lamdera check
+        run: lamdera check
+
+  deploy:
+    needs: check
     runs-on: ubuntu-latest
+    outputs:
+      preview-url: ${{ steps.set-url.outputs.preview-url }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-
-      - name: Cache Elm artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.elm
-            elm-stuff
-          key: elm-${{ hashFiles('elm.json') }}
-          restore-keys: elm-
+          fetch-depth: 0
 
       - name: Cache lamdera binary
         id: cache-lamdera
@@ -84,10 +85,71 @@ jobs:
           curl -sSL https://static.lamdera.com/bin/lamdera-1.3.0-linux-x86_64 -o /usr/local/bin/lamdera
           chmod +x /usr/local/bin/lamdera
 
+      - name: Set up SSH for Lamdera
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LAMDERA_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 apps.lamdera.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Add lamdera remote
+        run: git remote add lamdera git@apps.lamdera.com:tabular.git
+
+      - name: Checkout PR head branch
+        if: github.event_name == 'pull_request'
+        run: git checkout "${{ github.head_ref }}"
+
+      - name: Deploy
+        run: lamdera deploy
+
+      - name: Set preview URL
+        id: set-url
+        if: github.event_name == 'pull_request'
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          SLUG="${BRANCH//\//-}"
+          echo "preview-url=https://tabular-${SLUG}.lamdera.app" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache Elm artifacts
+        if: github.event_name == 'push'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elm
+            elm-stuff
+          key: elm-${{ hashFiles('elm.json') }}
+          restore-keys: elm-
+
+      - name: Cache lamdera binary
+        if: github.event_name == 'push'
+        id: cache-lamdera
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/lamdera
+          key: lamdera-1.3.0-linux-x86_64
+
+      - name: Install lamdera
+        if: github.event_name == 'push' && steps.cache-lamdera.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://static.lamdera.com/bin/lamdera-1.3.0-linux-x86_64 -o /usr/local/bin/lamdera
+          chmod +x /usr/local/bin/lamdera
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build
+        if: github.event_name == 'push'
         run: npm run build
 
       - name: Cache Playwright browsers
@@ -104,7 +166,31 @@ jobs:
       - name: Install Playwright system deps
         run: npx playwright install-deps chromium
 
-      - name: Run E2E tests
+      - name: Wait for preview deployment
+        if: github.event_name == 'pull_request'
+        env:
+          PREVIEW_URL: ${{ needs.deploy.outputs.preview-url }}
+        run: |
+          echo "Waiting for $PREVIEW_URL to become available..."
+          for i in $(seq 1 30); do
+            if curl -sSf "$PREVIEW_URL" > /dev/null 2>&1; then
+              echo "Preview is up!"
+              exit 0
+            fi
+            echo "Attempt $i/30 — not ready yet, waiting 10s..."
+            sleep 10
+          done
+          echo "Preview did not become available in time"
+          exit 1
+
+      - name: Run E2E tests (preview)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_URL: ${{ needs.deploy.outputs.preview-url }}
+        run: npx playwright test
+
+      - name: Run E2E tests (local)
+        if: github.event_name == 'push'
         run: npx playwright test
 
       - name: Upload Playwright report
@@ -114,3 +200,41 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+
+  comment-preview:
+    needs: [deploy, e2e]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const previewUrl = '${{ needs.deploy.outputs.preview-url }}';
+            const marker = '<!-- lamdera-preview -->';
+            const body = `${marker}\n**Preview deployment:** ${previewUrl}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
