@@ -58,9 +58,28 @@ init _ key =
       , showImport = False
       , importText = ""
       , collapsedSections = SeqSet.empty
+      , undoStack = []
       }
     , Command.none
     )
+
+
+snapshot : Model -> TableSnapshot
+snapshot model =
+    { rows = model.rows
+    , cols = model.cols
+    , cells = model.cells
+    , alignments = model.alignments
+    , horizontalLineStyles = model.horizontalLineStyles
+    , verticalLineStyles = model.verticalLineStyles
+    , cellHorizontalStyles = model.cellHorizontalStyles
+    , cellVerticalStyles = model.cellVerticalStyles
+    }
+
+
+pushUndo : Model -> List TableSnapshot
+pushUndo model =
+    snapshot model :: model.undoStack |> List.take 50
 
 
 update : FrontendMsg -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -83,10 +102,10 @@ update msg model =
             )
 
         AddRow ->
-            ( { model | rows = model.rows + 1 }, Command.none )
+            ( { model | rows = model.rows + 1, undoStack = pushUndo model }, Command.none )
 
         AddColumn ->
-            ( { model | cols = model.cols + 1 }, Command.none )
+            ( { model | cols = model.cols + 1, undoStack = pushUndo model }, Command.none )
 
         RemoveRow rowIndex ->
             if model.rows > 1 then
@@ -96,6 +115,7 @@ update msg model =
                     , horizontalLineStyles = removeIndexFromDict (rowIndex + 1) model.horizontalLineStyles
                     , cellHorizontalStyles = removeCellStyleRow rowIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleRow rowIndex model.cellVerticalStyles
+                    , undoStack = pushUndo model
                   }
                 , Command.none
                 )
@@ -112,6 +132,7 @@ update msg model =
                     , verticalLineStyles = removeIndexFromDict (colIndex + 1) model.verticalLineStyles
                     , cellHorizontalStyles = removeCellStyleCol colIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleCol colIndex model.cellVerticalStyles
+                    , undoStack = pushUndo model
                   }
                 , Command.none
                 )
@@ -126,6 +147,7 @@ update msg model =
                 , horizontalLineStyles = insertIndexIntoDict (index + 1) model.horizontalLineStyles
                 , cellHorizontalStyles = insertCellStyleRow index model.cellHorizontalStyles
                 , cellVerticalStyles = insertCellVStyleRow index model.cellVerticalStyles
+                , undoStack = pushUndo model
               }
             , Command.none
             )
@@ -138,6 +160,7 @@ update msg model =
                 , verticalLineStyles = insertIndexIntoDict (index + 1) model.verticalLineStyles
                 , cellHorizontalStyles = insertCellStyleCol index model.cellHorizontalStyles
                 , cellVerticalStyles = insertCellVStyleCol index model.cellVerticalStyles
+                , undoStack = pushUndo model
               }
             , Command.none
             )
@@ -175,6 +198,7 @@ update msg model =
                     , cellVerticalStyles = Dict.empty
                     , showImport = False
                     , importText = ""
+                    , undoStack = pushUndo model
                   }
                 , Command.none
                 )
@@ -231,6 +255,26 @@ update msg model =
             ( { model | cellVerticalStyles = Dict.insert ( row, vIdx ) (cycleLineStyle current) model.cellVerticalStyles }
             , Command.none
             )
+
+        Undo ->
+            case model.undoStack of
+                s :: rest ->
+                    ( { model
+                        | rows = s.rows
+                        , cols = s.cols
+                        , cells = s.cells
+                        , alignments = s.alignments
+                        , horizontalLineStyles = s.horizontalLineStyles
+                        , verticalLineStyles = s.verticalLineStyles
+                        , cellHorizontalStyles = s.cellHorizontalStyles
+                        , cellVerticalStyles = s.cellVerticalStyles
+                        , undoStack = rest
+                      }
+                    , Command.none
+                    )
+
+                [] ->
+                    ( model, Command.none )
 
         ToggleSection section ->
             let
@@ -1709,10 +1753,15 @@ body {
     gap: 4px;
 }
 
-.add-btn:hover {
+.add-btn:hover:not(:disabled) {
     background: #f0f4ff;
     border-color: #4a90d9;
     color: #4a90d9;
+}
+
+.add-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .button-row {
@@ -2362,6 +2411,13 @@ viewTableEditor model =
                         "Import Data"
                     )
                 ]
+            , button
+                [ Attr.id "undo-btn"
+                , Attr.class "add-btn"
+                , onClick Undo
+                , Attr.disabled (List.isEmpty model.undoStack)
+                ]
+                [ text "Undo" ]
             ]
         ]
 
