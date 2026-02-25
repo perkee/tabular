@@ -23,3 +23,4 @@ config =
     , NoUnused.Patterns.rule
     , Simplify.rule Simplify.defaults
     ]
+        |> List.map (Review.Rule.ignoreErrorsForDirectories [ "src/Evergreen" ])
