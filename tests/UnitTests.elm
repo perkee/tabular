@@ -639,6 +639,222 @@ removeCellStyleColTests =
         ]
 
 
+insertRowTests : Test
+insertRowTests =
+    describe "insertRow"
+        [ test "inserts at beginning and shifts all rows up" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "a" )
+                            , ( ( 1, 0 ), "b" )
+                            ]
+
+                    result =
+                        insertRow 0 cells
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just "a") (Dict.get ( 1, 0 ) r)
+                    , \r -> Expect.equal (Just "b") (Dict.get ( 2, 0 ) r)
+                    , \r -> Expect.equal Nothing (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal 2 (Dict.size r)
+                    ]
+                    result
+        , test "inserts in the middle" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "a" )
+                            , ( ( 1, 0 ), "b" )
+                            , ( ( 2, 0 ), "c" )
+                            ]
+
+                    result =
+                        insertRow 1 cells
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal (Just "b") (Dict.get ( 2, 0 ) r)
+                    , \r -> Expect.equal (Just "c") (Dict.get ( 3, 0 ) r)
+                    , \r -> Expect.equal Nothing (Dict.get ( 1, 0 ) r)
+                    , \r -> Expect.equal 3 (Dict.size r)
+                    ]
+                    result
+        , test "inserts at the end" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "a" )
+                            , ( ( 1, 0 ), "b" )
+                            ]
+
+                    result =
+                        insertRow 2 cells
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal (Just "b") (Dict.get ( 1, 0 ) r)
+                    , \r -> Expect.equal 2 (Dict.size r)
+                    ]
+                    result
+        ]
+
+
+insertColumnTests : Test
+insertColumnTests =
+    describe "insertColumn"
+        [ test "inserts at beginning and shifts all columns right" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "a" )
+                            , ( ( 0, 1 ), "b" )
+                            ]
+
+                    result =
+                        insertColumn 0 cells
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 1 ) r)
+                    , \r -> Expect.equal (Just "b") (Dict.get ( 0, 2 ) r)
+                    , \r -> Expect.equal Nothing (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal 2 (Dict.size r)
+                    ]
+                    result
+        , test "inserts in the middle" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "a" )
+                            , ( ( 0, 1 ), "b" )
+                            , ( ( 0, 2 ), "c" )
+                            ]
+
+                    result =
+                        insertColumn 1 cells
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal (Just "b") (Dict.get ( 0, 2 ) r)
+                    , \r -> Expect.equal (Just "c") (Dict.get ( 0, 3 ) r)
+                    , \r -> Expect.equal Nothing (Dict.get ( 0, 1 ) r)
+                    , \r -> Expect.equal 3 (Dict.size r)
+                    ]
+                    result
+        ]
+
+
+insertColumnAlignmentsTests : Test
+insertColumnAlignmentsTests =
+    describe "insertColumnAlignments"
+        [ test "inserts and shifts alignments" <|
+            \_ ->
+                let
+                    alignments =
+                        Dict.fromList
+                            [ ( 0, AlignLeft )
+                            , ( 1, AlignCenter )
+                            , ( 2, AlignRight )
+                            ]
+
+                    result =
+                        insertColumnAlignments 1 alignments
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just AlignLeft) (Dict.get 0 r)
+                    , \r -> Expect.equal Nothing (Dict.get 1 r)
+                    , \r -> Expect.equal (Just AlignCenter) (Dict.get 2 r)
+                    , \r -> Expect.equal (Just AlignRight) (Dict.get 3 r)
+                    , \r -> Expect.equal 3 (Dict.size r)
+                    ]
+                    result
+        ]
+
+
+insertIndexIntoDictTests : Test
+insertIndexIntoDictTests =
+    describe "insertIndexIntoDict"
+        [ test "shifts indices at and above insertion point" <|
+            \_ ->
+                let
+                    dict =
+                        Dict.fromList
+                            [ ( 0, Thin )
+                            , ( 1, Thick )
+                            , ( 2, Double )
+                            ]
+
+                    result =
+                        insertIndexIntoDict 1 dict
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just Thin) (Dict.get 0 r)
+                    , \r -> Expect.equal Nothing (Dict.get 1 r)
+                    , \r -> Expect.equal (Just Thick) (Dict.get 2 r)
+                    , \r -> Expect.equal (Just Double) (Dict.get 3 r)
+                    , \r -> Expect.equal 3 (Dict.size r)
+                    ]
+                    result
+        ]
+
+
+insertCellStyleRowTests : Test
+insertCellStyleRowTests =
+    describe "insertCellStyleRow"
+        [ test "shifts horizontal line indices above insertion row" <|
+            \_ ->
+                let
+                    styles =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), Thin )
+                            , ( ( 1, 0 ), Thick )
+                            , ( ( 2, 0 ), Double )
+                            ]
+
+                    result =
+                        insertCellStyleRow 1 styles
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just Thin) (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal (Just Thick) (Dict.get ( 1, 0 ) r)
+                    , \r -> Expect.equal (Just Double) (Dict.get ( 3, 0 ) r)
+                    , \r -> Expect.equal 3 (Dict.size r)
+                    ]
+                    result
+        ]
+
+
+insertCellStyleColTests : Test
+insertCellStyleColTests =
+    describe "insertCellStyleCol"
+        [ test "shifts column indices at and above insertion col" <|
+            \_ ->
+                let
+                    styles =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), Thin )
+                            , ( ( 0, 1 ), Thick )
+                            , ( ( 0, 2 ), Double )
+                            ]
+
+                    result =
+                        insertCellStyleCol 1 styles
+                in
+                Expect.all
+                    [ \r -> Expect.equal (Just Thin) (Dict.get ( 0, 0 ) r)
+                    , \r -> Expect.equal (Just Thick) (Dict.get ( 0, 2 ) r)
+                    , \r -> Expect.equal (Just Double) (Dict.get ( 0, 3 ) r)
+                    , \r -> Expect.equal 3 (Dict.size r)
+                    ]
+                    result
+        ]
+
+
 
 -- SMALL HELPERS
 
