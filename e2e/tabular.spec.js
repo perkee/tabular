@@ -74,6 +74,42 @@ test('remove column removes that column', async ({ page }) => {
   await expect(page.locator('#cell-0-2')).toHaveCount(0);
 });
 
+// --- Insert rows and columns ---
+
+test('insert row before row 1 shifts content down', async ({ page }) => {
+  // Fill row 1 with known content
+  await page.locator('#cell-1-0').fill('R1C0');
+
+  // Click insert-row-1 to insert before row 1
+  await page.locator('#insert-row-1').click();
+
+  // Grid should now be 4 rows
+  await expect(page.locator('#cell-3-0')).toHaveCount(1);
+
+  // Original row 1 content should now be at row 2
+  await expect(page.locator('#cell-2-0')).toHaveValue('R1C0');
+
+  // New row 1 should be empty
+  await expect(page.locator('#cell-1-0')).toHaveValue('');
+});
+
+test('insert column before column 1 shifts content right', async ({ page }) => {
+  // Fill column 1 with known content
+  await page.locator('#cell-0-1').fill('R0C1');
+
+  // Click insert-col-1 to insert before column 1
+  await page.locator('#insert-col-1').click();
+
+  // Grid should now be 4 columns
+  await expect(page.locator('#cell-0-3')).toHaveCount(1);
+
+  // Original column 1 content should now be at column 2
+  await expect(page.locator('#cell-0-2')).toHaveValue('R0C1');
+
+  // New column 1 should be empty
+  await expect(page.locator('#cell-0-1')).toHaveValue('');
+});
+
 // --- Format toggle ---
 
 test('switching to compact format changes markdown output', async ({ page }) => {

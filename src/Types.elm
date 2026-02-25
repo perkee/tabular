@@ -75,6 +75,8 @@ type FrontendMsg
     | AddColumn
     | RemoveRow Int
     | RemoveColumn Int
+    | InsertRow Int
+    | InsertColumn Int
     | SetOutputFormat OutputFormat
     | SetAlignment Int Alignment
     | ToggleImport

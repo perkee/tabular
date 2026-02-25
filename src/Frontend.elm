@@ -119,6 +119,29 @@ update msg model =
             else
                 ( model, Command.none )
 
+        InsertRow index ->
+            ( { model
+                | rows = model.rows + 1
+                , cells = insertRow index model.cells
+                , horizontalLineStyles = insertIndexIntoDict (index + 1) model.horizontalLineStyles
+                , cellHorizontalStyles = insertCellStyleRow index model.cellHorizontalStyles
+                , cellVerticalStyles = insertCellVStyleRow index model.cellVerticalStyles
+              }
+            , Command.none
+            )
+
+        InsertColumn index ->
+            ( { model
+                | cols = model.cols + 1
+                , cells = insertColumn index model.cells
+                , alignments = insertColumnAlignments index model.alignments
+                , verticalLineStyles = insertIndexIntoDict (index + 1) model.verticalLineStyles
+                , cellHorizontalStyles = insertCellStyleCol index model.cellHorizontalStyles
+                , cellVerticalStyles = insertCellVStyleCol index model.cellVerticalStyles
+              }
+            , Command.none
+            )
+
         SetOutputFormat format ->
             ( { model | outputFormat = format }, Command.none )
 
@@ -382,6 +405,126 @@ removeCellVStyleCol colIdx dict =
 
                 else
                     Just ( ( r, vi ), v )
+            )
+        |> Dict.fromList
+
+
+insertRow : Int -> Dict ( Int, Int ) String -> Dict ( Int, Int ) String
+insertRow idx cells =
+    cells
+        |> Dict.toList
+        |> List.map
+            (\( ( r, c ), v ) ->
+                if r >= idx then
+                    ( ( r + 1, c ), v )
+
+                else
+                    ( ( r, c ), v )
+            )
+        |> Dict.fromList
+
+
+insertColumn : Int -> Dict ( Int, Int ) String -> Dict ( Int, Int ) String
+insertColumn idx cells =
+    cells
+        |> Dict.toList
+        |> List.map
+            (\( ( r, c ), v ) ->
+                if c >= idx then
+                    ( ( r, c + 1 ), v )
+
+                else
+                    ( ( r, c ), v )
+            )
+        |> Dict.fromList
+
+
+insertColumnAlignments : Int -> Dict Int Alignment -> Dict Int Alignment
+insertColumnAlignments idx alignments =
+    alignments
+        |> Dict.toList
+        |> List.map
+            (\( c, a ) ->
+                if c >= idx then
+                    ( c + 1, a )
+
+                else
+                    ( c, a )
+            )
+        |> Dict.fromList
+
+
+insertIndexIntoDict : Int -> Dict Int a -> Dict Int a
+insertIndexIntoDict idx dict =
+    dict
+        |> Dict.toList
+        |> List.map
+            (\( k, v ) ->
+                if k >= idx then
+                    ( k + 1, v )
+
+                else
+                    ( k, v )
+            )
+        |> Dict.fromList
+
+
+insertCellStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellStyleRow rowIdx dict =
+    dict
+        |> Dict.toList
+        |> List.map
+            (\( ( h, c ), v ) ->
+                if h > rowIdx then
+                    ( ( h + 1, c ), v )
+
+                else
+                    ( ( h, c ), v )
+            )
+        |> Dict.fromList
+
+
+insertCellVStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellVStyleRow rowIdx dict =
+    dict
+        |> Dict.toList
+        |> List.map
+            (\( ( r, vi ), v ) ->
+                if r >= rowIdx then
+                    ( ( r + 1, vi ), v )
+
+                else
+                    ( ( r, vi ), v )
+            )
+        |> Dict.fromList
+
+
+insertCellStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellStyleCol colIdx dict =
+    dict
+        |> Dict.toList
+        |> List.map
+            (\( ( h, c ), v ) ->
+                if c >= colIdx then
+                    ( ( h, c + 1 ), v )
+
+                else
+                    ( ( h, c ), v )
+            )
+        |> Dict.fromList
+
+
+insertCellVStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellVStyleCol colIdx dict =
+    dict
+        |> Dict.toList
+        |> List.map
+            (\( ( r, vi ), v ) ->
+                if vi > colIdx then
+                    ( ( r, vi + 1 ), v )
+
+                else
+                    ( ( r, vi ), v )
             )
         |> Dict.fromList
 
@@ -1468,37 +1611,48 @@ body {
     border-color: #4a90d9;
 }
 
-.del-col-btn, .del-row-btn {
-    background: none;
-    border: 1px solid transparent;
-    color: #c0c4cc;
-    cursor: pointer;
-    font-size: 16px;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+.btn-pill {
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.pill-add-btn, .pill-del-btn {
+    padding: 4px 6px;
+    border: none;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 600;
     transition: all 0.15s;
     line-height: 1;
+    color: #9ca3af;
 }
 
-.del-col-btn:hover, .del-row-btn:hover {
+.pill-add-btn {
+    border-right: 1px solid #e5e7eb;
+}
+
+.pill-add-btn:hover {
+    color: #22c55e;
+    background: #f0fdf4;
+}
+
+.pill-del-btn:hover {
     color: #ef4444;
     background: #fef2f2;
-    border-color: #fecaca;
 }
 
-.del-col-btn:disabled, .del-row-btn:disabled {
+.pill-del-btn:disabled {
     opacity: 0.25;
     cursor: not-allowed;
 }
 
-.del-col-btn:disabled:hover, .del-row-btn:disabled:hover {
-    color: #c0c4cc;
-    background: none;
-    border-color: transparent;
+.pill-del-btn:disabled:hover {
+    color: #9ca3af;
+    background: white;
 }
 
 .align-group {
@@ -1886,29 +2040,38 @@ viewTableEditor model =
         canDeleteRow =
             model.rows > 1
 
-        deleteColHeaderRow =
+        colPillRow =
             tr []
                 (td [] []
                     :: List.concatMap
                         (\c ->
                             let
-                                delTd =
+                                pillTd =
                                     td [ Attr.style "text-align" "center" ]
-                                        [ button
-                                            [ Attr.id ("del-col-" ++ String.fromInt c)
-                                            , Attr.class "del-col-btn"
-                                            , Attr.title ("Remove column " ++ String.fromInt (c + 1))
-                                            , onClick (RemoveColumn c)
-                                            , Attr.disabled (not canDeleteCol)
+                                        [ div [ Attr.class "btn-pill" ]
+                                            [ button
+                                                [ Attr.id ("insert-col-" ++ String.fromInt c)
+                                                , Attr.class "pill-add-btn"
+                                                , Attr.title ("Insert column before column " ++ String.fromInt (c + 1))
+                                                , onClick (InsertColumn c)
+                                                ]
+                                                [ text "+" ]
+                                            , button
+                                                [ Attr.id ("del-col-" ++ String.fromInt c)
+                                                , Attr.class "pill-del-btn"
+                                                , Attr.title ("Remove column " ++ String.fromInt (c + 1))
+                                                , onClick (RemoveColumn c)
+                                                , Attr.disabled (not canDeleteCol)
+                                                ]
+                                                [ text "×" ]
                                             ]
-                                            [ text "×" ]
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ delTd, td [ Attr.class "vsep-cell" ] [] ]
+                                [ pillTd, td [ Attr.class "vsep-cell" ] [] ]
 
                             else
-                                [ delTd ]
+                                [ pillTd ]
                         )
                         colRange
                     ++ [ td [] [] ]
@@ -2095,14 +2258,23 @@ viewTableEditor model =
                         )
                         colRange
                     ++ [ td [ Attr.style "vertical-align" "middle" ]
-                            [ button
-                                [ Attr.id ("del-row-" ++ String.fromInt r)
-                                , Attr.class "del-row-btn"
-                                , Attr.title ("Remove row " ++ String.fromInt (r + 1))
-                                , onClick (RemoveRow r)
-                                , Attr.disabled (not canDeleteRow)
+                            [ div [ Attr.class "btn-pill" ]
+                                [ button
+                                    [ Attr.id ("insert-row-" ++ String.fromInt r)
+                                    , Attr.class "pill-add-btn"
+                                    , Attr.title ("Insert row before row " ++ String.fromInt (r + 1))
+                                    , onClick (InsertRow r)
+                                    ]
+                                    [ text "+" ]
+                                , button
+                                    [ Attr.id ("del-row-" ++ String.fromInt r)
+                                    , Attr.class "pill-del-btn"
+                                    , Attr.title ("Remove row " ++ String.fromInt (r + 1))
+                                    , onClick (RemoveRow r)
+                                    , Attr.disabled (not canDeleteRow)
+                                    ]
+                                    [ text "×" ]
                                 ]
-                                [ text "×" ]
                             ]
                        ]
                 )
@@ -2117,7 +2289,7 @@ viewTableEditor model =
                         [ hSepRow r, dataRow r ]
                 )
                 rowRange
-                ++ [ hSepRow model.rows ]
+                ++ [ hSepRow model.rows, colPillRow ]
 
         vsepButton vIdx =
             let
@@ -2173,7 +2345,7 @@ viewTableEditor model =
           else
             text ""
         , table [ Attr.class "editor-table" ]
-            [ thead [] [ deleteColHeaderRow, alignmentRow ]
+            [ thead [] [ alignmentRow ]
             , tbody [] bodyRows
             ]
         , div [ Attr.class "button-row" ]
