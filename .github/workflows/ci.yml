@@ -47,6 +47,9 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -t ed25519 apps.lamdera.com >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Add lamdera remote
+        run: git remote add lamdera git@apps.lamdera.com:tabular.git
+
       - name: Install dependencies
         run: npm ci
 
