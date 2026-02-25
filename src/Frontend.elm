@@ -12,6 +12,7 @@ import Html.Events exposing (onClick, onInput)
 import Svg
 import Svg.Attributes as SvgAttr
 import Lamdera
+import SeqSet
 import Types exposing (..)
 import Url
 
@@ -56,7 +57,7 @@ init _ key =
       , outputFormat = Expanded
       , showImport = False
       , importText = ""
-      , collapsedSections = []
+      , collapsedSections = SeqSet.empty
       }
     , Command.none
     )
@@ -211,11 +212,11 @@ update msg model =
         ToggleSection section ->
             let
                 newSections =
-                    if List.member section model.collapsedSections then
-                        List.filter (\s -> s /= section) model.collapsedSections
+                    if SeqSet.member section model.collapsedSections then
+                        SeqSet.remove section model.collapsedSections
 
                     else
-                        section :: model.collapsedSections
+                        SeqSet.insert section model.collapsedSections
             in
             ( { model | collapsedSections = newSections }, Command.none )
 
@@ -2197,7 +2198,7 @@ viewMarkdownOutput : Model -> Html FrontendMsg
 viewMarkdownOutput model =
     let
         collapsed =
-            List.member MarkdownSection model.collapsedSections
+            SeqSet.member MarkdownSection model.collapsedSections
 
         markdown =
             generateMarkdown model.outputFormat model.rows model.cols model.cells model.alignments
@@ -2342,7 +2343,7 @@ viewRenderedTable model =
                 (List.range 1 (model.rows - 1))
 
         collapsed =
-            List.member PreviewSection model.collapsedSections
+            SeqSet.member PreviewSection model.collapsedSections
     in
     div [ Attr.class "output-section" ]
         (div
@@ -2387,7 +2388,7 @@ viewHtmlTableOutput : Model -> Html FrontendMsg
 viewHtmlTableOutput model =
     let
         collapsed =
-            List.member HtmlSection model.collapsedSections
+            SeqSet.member HtmlSection model.collapsedSections
 
         htmlTable =
             generateHtmlTable model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
@@ -2438,7 +2439,7 @@ viewBoxDrawingOutput : Model -> Html FrontendMsg
 viewBoxDrawingOutput model =
     let
         collapsed =
-            List.member BoxDrawingSection model.collapsedSections
+            SeqSet.member BoxDrawingSection model.collapsedSections
 
         boxDrawing =
             generateBoxDrawing model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
