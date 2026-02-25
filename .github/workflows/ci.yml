@@ -178,8 +178,8 @@ jobs:
           retention-days: 14
 
   comment-preview:
-    needs: [deploy, e2e]
-    if: always() && github.event_name == 'pull_request' && needs.deploy.result == 'success'
+    needs: deploy
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
