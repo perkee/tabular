@@ -79,8 +79,14 @@ jobs:
       - name: Deploy
         id: set-url
         run: |
+          set +e
           OUTPUT=$(git push lamdera HEAD -f 2>&1)
+          EXIT_CODE=$?
+          set -e
           echo "$OUTPUT"
+          if [ $EXIT_CODE -ne 0 ]; then
+            exit $EXIT_CODE
+          fi
           SLUG=$(echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | sed -n 's/.*Starting preview deploy for `\([^`]*\)`.*/\1/p')
           if [ -n "$SLUG" ]; then
             echo "preview-url=https://${SLUG}.lamdera.app" >> "$GITHUB_OUTPUT"
