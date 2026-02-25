@@ -223,6 +223,80 @@ test('clicking output section header collapses and expands its content', async (
   await expect(page.locator('#box-output')).toHaveCount(1);
 });
 
+// --- Undo ---
+
+test('undo button is disabled when there is no history', async ({ page }) => {
+  await expect(page.locator('#undo-btn')).toBeDisabled();
+});
+
+test('undo reverts add row', async ({ page }) => {
+  // Initially 3x3 grid — cell-3-0 should not exist
+  await expect(page.locator('#cell-3-0')).toHaveCount(0);
+
+  await page.locator('#add-row').click();
+  await expect(page.locator('#cell-3-0')).toHaveCount(1);
+  await expect(page.locator('#undo-btn')).toBeEnabled();
+
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-3-0')).toHaveCount(0);
+  await expect(page.locator('#undo-btn')).toBeDisabled();
+});
+
+test('undo reverts add column', async ({ page }) => {
+  await expect(page.locator('#cell-0-3')).toHaveCount(0);
+
+  await page.locator('#add-column').click();
+  await expect(page.locator('#cell-0-3')).toHaveCount(1);
+
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-0-3')).toHaveCount(0);
+});
+
+test('undo reverts remove row and restores cell content', async ({ page }) => {
+  // Fill a cell in row 2
+  await page.locator('#cell-2-0').fill('RowData');
+
+  await page.locator('#del-row-2').click();
+  await expect(page.locator('#cell-2-0')).toHaveCount(0);
+
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-2-0')).toHaveValue('RowData');
+});
+
+test('undo reverts import data', async ({ page }) => {
+  // Remember original header
+  await expect(page.locator('#cell-0-0')).toHaveValue('Header 1');
+
+  await page.locator('#toggle-import').click();
+  await page.locator('#import-textarea').fill('A,B\n1,2');
+  await page.locator('#import-btn').click();
+
+  await expect(page.locator('#cell-0-0')).toHaveValue('A');
+
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-0-0')).toHaveValue('Header 1');
+  // Grid should be back to 3x3
+  await expect(page.locator('#cell-2-2')).toHaveCount(1);
+});
+
+test('multiple undos work in sequence', async ({ page }) => {
+  await page.locator('#add-row').click();
+  await page.locator('#add-column').click();
+
+  // Now 4x4 grid
+  await expect(page.locator('#cell-3-3')).toHaveCount(1);
+
+  // Undo add column → 4x3
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-3-3')).toHaveCount(0);
+  await expect(page.locator('#cell-3-2')).toHaveCount(1);
+
+  // Undo add row → 3x3
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-3-2')).toHaveCount(0);
+  await expect(page.locator('#cell-2-2')).toHaveCount(1);
+});
+
 test('collapsing one section does not affect others', async ({ page }) => {
   // Collapse Markdown
   await page.locator('.output-section .output-header .output-title', { hasText: 'Markdown' }).click();

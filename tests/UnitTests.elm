@@ -986,6 +986,36 @@ lookupCornerTests =
         ]
 
 
+tableSnapshotTests : Test
+tableSnapshotTests =
+    describe "TableSnapshot"
+        [ test "snapshot record has expected fields" <|
+            \_ ->
+                let
+                    s : TableSnapshot
+                    s =
+                        { rows = 2
+                        , cols = 3
+                        , cells = Dict.fromList [ ( ( 0, 0 ), "A" ) ]
+                        , alignments = Dict.fromList [ ( 0, AlignCenter ) ]
+                        , horizontalLineStyles = Dict.fromList [ ( 0, Thick ) ]
+                        , verticalLineStyles = Dict.fromList [ ( 1, Double ) ]
+                        , cellHorizontalStyles = Dict.empty
+                        , cellVerticalStyles = Dict.empty
+                        }
+                in
+                Expect.all
+                    [ \snap -> Expect.equal 2 snap.rows
+                    , \snap -> Expect.equal 3 snap.cols
+                    , \snap -> Expect.equal (Just "A") (Dict.get ( 0, 0 ) snap.cells)
+                    , \snap -> Expect.equal (Just AlignCenter) (Dict.get 0 snap.alignments)
+                    , \snap -> Expect.equal (Just Thick) (Dict.get 0 snap.horizontalLineStyles)
+                    , \snap -> Expect.equal (Just Double) (Dict.get 1 snap.verticalLineStyles)
+                    ]
+                    s
+        ]
+
+
 getEffectiveStyleTests : Test
 getEffectiveStyleTests =
     describe "getEffectiveHStyle / getEffectiveVStyle"

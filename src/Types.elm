@@ -7,6 +7,18 @@ import SeqSet exposing (SeqSet)
 import Url exposing (Url)
 
 
+type alias TableSnapshot =
+    { rows : Int
+    , cols : Int
+    , cells : Dict ( Int, Int ) String
+    , alignments : Dict Int Alignment
+    , horizontalLineStyles : Dict Int LineStyle
+    , verticalLineStyles : Dict Int LineStyle
+    , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
+    , cellVerticalStyles : Dict ( Int, Int ) LineStyle
+    }
+
+
 type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
     , rows : Int
@@ -21,6 +33,7 @@ type alias FrontendModel =
     , showImport : Bool
     , importText : String
     , collapsedSections : SeqSet OutputSection
+    , undoStack : List TableSnapshot
     }
 
 
@@ -87,6 +100,7 @@ type FrontendMsg
     | CycleCellHorizontalStyle Int Int
     | CycleCellVerticalStyle Int Int
     | ToggleSection OutputSection
+    | Undo
 
 
 type ToBackend
