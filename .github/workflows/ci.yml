@@ -100,7 +100,7 @@ jobs:
         run: git checkout "${{ github.head_ref }}"
 
       - name: Deploy
-        run: lamdera deploy
+        run: echo y | lamdera deploy
 
       - name: Set preview URL
         id: set-url
