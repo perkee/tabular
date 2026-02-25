@@ -9,6 +9,8 @@ import Effect.Subscription as Subscription
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
+import Svg
+import Svg.Attributes as SvgAttr
 import Lamdera
 import Types exposing (..)
 import Url
@@ -1317,6 +1319,49 @@ generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVSt
 
 
 
+-- ICONS
+
+
+alignLeftIcon : Html msg
+alignLeftIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        ]
+        [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "7", SvgAttr.x2 "9", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "11", SvgAttr.x2 "11", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+alignCenterIcon : Html msg
+alignCenterIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        ]
+        [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "3", SvgAttr.y1 "7", SvgAttr.x2 "11", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "11", SvgAttr.x2 "12", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+alignRightIcon : Html msg
+alignRightIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        ]
+        [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "5", SvgAttr.y1 "7", SvgAttr.x2 "13", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "3", SvgAttr.y1 "11", SvgAttr.x2 "13", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+
 -- VIEW
 
 
@@ -1463,7 +1508,7 @@ body {
 }
 
 .align-btn {
-    padding: 3px 8px;
+    padding: 4px 6px;
     border: none;
     border-right: 1px solid #e5e7eb;
     background: white;
@@ -1474,6 +1519,10 @@ body {
     font-weight: 600;
     transition: all 0.15s;
     line-height: 1.2;
+}
+
+.align-btn svg {
+    display: block;
 }
 
 .align-btn:last-child {
@@ -1873,9 +1922,9 @@ viewTableEditor model =
                                 currentAlign =
                                     getAlignment c model.alignments
 
-                                alignBtn align label =
+                                alignBtn align idSuffix label icon =
                                     button
-                                        [ Attr.id ("align-" ++ String.fromInt c ++ "-" ++ String.toLower label)
+                                        [ Attr.id ("align-" ++ String.fromInt c ++ "-" ++ idSuffix)
                                         , Attr.class
                                             (if currentAlign == align then
                                                 "align-btn active"
@@ -1886,14 +1935,14 @@ viewTableEditor model =
                                         , onClick (SetAlignment c align)
                                         , Attr.title label
                                         ]
-                                        [ text label ]
+                                        [ icon ]
 
                                 alignTd =
                                     td [ Attr.style "text-align" "center" ]
                                         [ div [ Attr.class "align-group" ]
-                                            [ alignBtn AlignLeft "L"
-                                            , alignBtn AlignCenter "C"
-                                            , alignBtn AlignRight "R"
+                                            [ alignBtn AlignLeft "l" "Left" alignLeftIcon
+                                            , alignBtn AlignCenter "c" "Center" alignCenterIcon
+                                            , alignBtn AlignRight "r" "Right" alignRightIcon
                                             ]
                                         ]
                             in
