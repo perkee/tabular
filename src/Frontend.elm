@@ -9,10 +9,11 @@ import Effect.Subscription as Subscription
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
-import Svg
-import Svg.Attributes as SvgAttr
+import Index exposing (..)
 import Lamdera
 import SeqSet
+import Svg
+import Svg.Attributes as SvgAttr
 import Types exposing (..)
 import Url
 
@@ -41,20 +42,20 @@ app_ =
 init : Url.Url -> Nav.Key -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
 init _ key =
     ( { key = key
-      , rows = 3
-      , cols = 3
+      , rows = count 3
+      , cols = count 3
       , cells =
-            Dict.fromList
-                [ ( ( 0, 0 ), "Header 1" )
-                , ( ( 0, 1 ), "Header 2" )
-                , ( ( 0, 2 ), "Header 3" )
+            fromList2
+                [ ( index 0, index 0, "Header 1" )
+                , ( index 0, index 1, "Header 2" )
+                , ( index 0, index 2, "Header 3" )
                 ]
-      , headerAlignments = Dict.empty
-      , bodyAlignments = Dict.empty
-      , horizontalLineStyles = Dict.empty
-      , verticalLineStyles = Dict.empty
-      , cellHorizontalStyles = Dict.empty
-      , cellVerticalStyles = Dict.empty
+      , headerAlignments = empty
+      , bodyAlignments = empty
+      , horizontalLineStyles = empty
+      , verticalLineStyles = empty
+      , cellHorizontalStyles = empty2
+      , cellVerticalStyles = empty2
       , outputFormat = Expanded
       , showImport = False
       , importText = ""
@@ -99,22 +100,22 @@ update msg model =
             ( model, Command.none )
 
         CellChanged row col value ->
-            ( { model | cells = Dict.insert ( row, col ) value model.cells }
+            ( { model | cells = insert2 row col value model.cells }
             , Command.none
             )
 
         AddRow ->
-            ( { model | rows = model.rows + 1, undoStack = pushUndo model }, Command.none )
+            ( { model | rows = countPlusOne model.rows, undoStack = pushUndo model }, Command.none )
 
         AddColumn ->
-            ( { model | cols = model.cols + 1, undoStack = pushUndo model }, Command.none )
+            ( { model | cols = countPlusOne model.cols, undoStack = pushUndo model }, Command.none )
 
         RemoveRow rowIndex ->
-            if model.rows > 1 then
+            if countIsGreaterThan 1 model.rows then
                 ( { model
-                    | rows = model.rows - 1
+                    | rows = countMinusOne model.rows
                     , cells = removeRow rowIndex model.cells
-                    , horizontalLineStyles = removeIndexFromDict (rowIndex + 1) model.horizontalLineStyles
+                    , horizontalLineStyles = removeIndexFromDict (hLineBelow rowIndex) model.horizontalLineStyles
                     , cellHorizontalStyles = removeCellStyleRow rowIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleRow rowIndex model.cellVerticalStyles
                     , undoStack = pushUndo model
@@ -126,13 +127,13 @@ update msg model =
                 ( model, Command.none )
 
         RemoveColumn colIndex ->
-            if model.cols > 1 then
+            if countIsGreaterThan 1 model.cols then
                 ( { model
-                    | cols = model.cols - 1
+                    | cols = countMinusOne model.cols
                     , cells = removeColumn colIndex model.cells
                     , headerAlignments = removeColumnAlignments colIndex model.headerAlignments
                     , bodyAlignments = removeColumnAlignments colIndex model.bodyAlignments
-                    , verticalLineStyles = removeIndexFromDict (colIndex + 1) model.verticalLineStyles
+                    , verticalLineStyles = removeIndexFromDict (vLineRight colIndex) model.verticalLineStyles
                     , cellHorizontalStyles = removeCellStyleCol colIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleCol colIndex model.cellVerticalStyles
                     , undoStack = pushUndo model
@@ -143,27 +144,27 @@ update msg model =
             else
                 ( model, Command.none )
 
-        InsertRow index ->
+        InsertRow rowIdx ->
             ( { model
-                | rows = model.rows + 1
-                , cells = insertRow index model.cells
-                , horizontalLineStyles = insertIndexIntoDict (index + 1) model.horizontalLineStyles
-                , cellHorizontalStyles = insertCellStyleRow index model.cellHorizontalStyles
-                , cellVerticalStyles = insertCellVStyleRow index model.cellVerticalStyles
+                | rows = countPlusOne model.rows
+                , cells = insertRowCells rowIdx model.cells
+                , horizontalLineStyles = insertIndexIntoDict (hLineBelow rowIdx) model.horizontalLineStyles
+                , cellHorizontalStyles = insertCellStyleRow rowIdx model.cellHorizontalStyles
+                , cellVerticalStyles = insertCellVStyleRow rowIdx model.cellVerticalStyles
                 , undoStack = pushUndo model
               }
             , Command.none
             )
 
-        InsertColumn index ->
+        InsertColumn colIdx ->
             ( { model
-                | cols = model.cols + 1
-                , cells = insertColumn index model.cells
-                , headerAlignments = insertColumnAlignments index model.headerAlignments
-                , bodyAlignments = insertColumnAlignments index model.bodyAlignments
-                , verticalLineStyles = insertIndexIntoDict (index + 1) model.verticalLineStyles
-                , cellHorizontalStyles = insertCellStyleCol index model.cellHorizontalStyles
-                , cellVerticalStyles = insertCellVStyleCol index model.cellVerticalStyles
+                | cols = countPlusOne model.cols
+                , cells = insertColumnCells colIdx model.cells
+                , headerAlignments = insertColumnAlignments colIdx model.headerAlignments
+                , bodyAlignments = insertColumnAlignments colIdx model.bodyAlignments
+                , verticalLineStyles = insertIndexIntoDict (vLineRight colIdx) model.verticalLineStyles
+                , cellHorizontalStyles = insertCellStyleCol colIdx model.cellHorizontalStyles
+                , cellVerticalStyles = insertCellVStyleCol colIdx model.cellVerticalStyles
                 , undoStack = pushUndo model
               }
             , Command.none
@@ -173,12 +174,12 @@ update msg model =
             ( { model | outputFormat = format }, Command.none )
 
         SetHeaderAlignment col alignment ->
-            ( { model | headerAlignments = Dict.insert col alignment model.headerAlignments }
+            ( { model | headerAlignments = Index.insert col alignment model.headerAlignments }
             , Command.none
             )
 
         SetBodyAlignment col alignment ->
-            ( { model | bodyAlignments = Dict.insert col alignment model.bodyAlignments }
+            ( { model | bodyAlignments = Index.insert col alignment model.bodyAlignments }
             , Command.none
             )
 
@@ -195,17 +196,17 @@ update msg model =
                 parsed =
                     parseImportData model.importText
             in
-            if parsed.rows > 0 && parsed.cols > 0 then
+            if countIsGreaterThan 0 parsed.rows && countIsGreaterThan 0 parsed.cols then
                 ( { model
                     | rows = parsed.rows
                     , cols = parsed.cols
                     , cells = parsed.cells
-                    , headerAlignments = Dict.empty
-                    , bodyAlignments = Dict.empty
-                    , horizontalLineStyles = Dict.empty
-                    , verticalLineStyles = Dict.empty
-                    , cellHorizontalStyles = Dict.empty
-                    , cellVerticalStyles = Dict.empty
+                    , headerAlignments = empty
+                    , bodyAlignments = empty
+                    , horizontalLineStyles = empty
+                    , verticalLineStyles = empty
+                    , cellHorizontalStyles = empty2
+                    , cellVerticalStyles = empty2
                     , showImport = False
                     , importText = ""
                     , undoStack = pushUndo model
@@ -223,10 +224,10 @@ update msg model =
 
                 clearedCellStyles =
                     model.cellHorizontalStyles
-                        |> Dict.filter (\( h, _ ) _ -> h /= idx)
+                        |> filter2 (\h _ _ -> toInt h /= toInt idx)
             in
             ( { model
-                | horizontalLineStyles = Dict.insert idx (cycleLineStyle current) model.horizontalLineStyles
+                | horizontalLineStyles = Index.insert idx (cycleLineStyle current) model.horizontalLineStyles
                 , cellHorizontalStyles = clearedCellStyles
               }
             , Command.none
@@ -239,10 +240,10 @@ update msg model =
 
                 clearedCellStyles =
                     model.cellVerticalStyles
-                        |> Dict.filter (\( _, v ) _ -> v /= idx)
+                        |> filter2 (\_ v _ -> toInt v /= toInt idx)
             in
             ( { model
-                | verticalLineStyles = Dict.insert idx (cycleLineStyle current) model.verticalLineStyles
+                | verticalLineStyles = Index.insert idx (cycleLineStyle current) model.verticalLineStyles
                 , cellVerticalStyles = clearedCellStyles
               }
             , Command.none
@@ -253,7 +254,7 @@ update msg model =
                 current =
                     getEffectiveHStyle hIdx col model.cellHorizontalStyles model.horizontalLineStyles
             in
-            ( { model | cellHorizontalStyles = Dict.insert ( hIdx, col ) (cycleLineStyle current) model.cellHorizontalStyles }
+            ( { model | cellHorizontalStyles = insert2 hIdx col (cycleLineStyle current) model.cellHorizontalStyles }
             , Command.none
             )
 
@@ -262,7 +263,7 @@ update msg model =
                 current =
                     getEffectiveVStyle row vIdx model.cellVerticalStyles model.verticalLineStyles
             in
-            ( { model | cellVerticalStyles = Dict.insert ( row, vIdx ) (cycleLineStyle current) model.cellVerticalStyles }
+            ( { model | cellVerticalStyles = insert2 row vIdx (cycleLineStyle current) model.cellVerticalStyles }
             , Command.none
             )
 
@@ -310,298 +311,312 @@ updateFromBackend msg model =
 -- HELPERS
 
 
-removeRow : Int -> Dict ( Int, Int ) String -> Dict ( Int, Int ) String
+removeRow : RowIndex -> IndexDict2 Row_ Column_ String -> IndexDict2 Row_ Column_ String
 removeRow rowToRemove cells =
     cells
-        |> Dict.toList
+        |> toList2
         |> List.filterMap
-            (\( ( r, c ), v ) ->
-                if r == rowToRemove then
+            (\( r, c, v ) ->
+                if toInt r == toInt rowToRemove then
                     Nothing
 
-                else if r > rowToRemove then
-                    Just ( ( r - 1, c ), v )
+                else if toInt r > toInt rowToRemove then
+                    Just ( prev r, c, v )
 
                 else
-                    Just ( ( r, c ), v )
+                    Just ( r, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-removeColumn : Int -> Dict ( Int, Int ) String -> Dict ( Int, Int ) String
+removeColumn : ColumnIndex -> IndexDict2 Row_ Column_ String -> IndexDict2 Row_ Column_ String
 removeColumn colToRemove cells =
     cells
-        |> Dict.toList
+        |> toList2
         |> List.filterMap
-            (\( ( r, c ), v ) ->
-                if c == colToRemove then
+            (\( r, c, v ) ->
+                if toInt c == toInt colToRemove then
                     Nothing
 
-                else if c > colToRemove then
-                    Just ( ( r, c - 1 ), v )
+                else if toInt c > toInt colToRemove then
+                    Just ( r, prev c, v )
 
                 else
-                    Just ( ( r, c ), v )
+                    Just ( r, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-getCell : Int -> Int -> Dict ( Int, Int ) String -> String
+getCell : RowIndex -> ColumnIndex -> IndexDict2 Row_ Column_ String -> String
 getCell row col cells =
-    Dict.get ( row, col ) cells |> Maybe.withDefault ""
+    get2 row col cells |> Maybe.withDefault ""
 
 
-removeColumnAlignments : Int -> Dict Int Alignment -> Dict Int Alignment
+removeColumnAlignments : ColumnIndex -> IndexDict Column_ Alignment -> IndexDict Column_ Alignment
 removeColumnAlignments colToRemove alignments =
     alignments
-        |> Dict.toList
+        |> Index.toList
         |> List.filterMap
             (\( c, a ) ->
-                if c == colToRemove then
+                if toInt c == toInt colToRemove then
                     Nothing
 
-                else if c > colToRemove then
-                    Just ( c - 1, a )
+                else if toInt c > toInt colToRemove then
+                    Just ( prev c, a )
 
                 else
                     Just ( c, a )
             )
-        |> Dict.fromList
+        |> Index.fromList
 
 
-getHeaderAlignment : Int -> Dict Int Alignment -> Alignment
+getHeaderAlignment : ColumnIndex -> IndexDict Column_ Alignment -> Alignment
 getHeaderAlignment col alignments =
-    Dict.get col alignments |> Maybe.withDefault AlignCenter
+    Index.get col alignments |> Maybe.withDefault AlignCenter
 
 
-getBodyAlignment : Int -> Dict Int Alignment -> Alignment
+getBodyAlignment : ColumnIndex -> IndexDict Column_ Alignment -> Alignment
 getBodyAlignment col alignments =
-    Dict.get col alignments |> Maybe.withDefault AlignLeft
+    Index.get col alignments |> Maybe.withDefault AlignLeft
 
 
-removeIndexFromDict : Int -> Dict Int a -> Dict Int a
+removeIndexFromDict : Index a -> IndexDict a v -> IndexDict a v
 removeIndexFromDict idx dict =
     dict
-        |> Dict.toList
+        |> Index.toList
         |> List.filterMap
             (\( k, v ) ->
-                if k == idx then
+                if toInt k == toInt idx then
                     Nothing
 
-                else if k > idx then
-                    Just ( k - 1, v )
+                else if toInt k > toInt idx then
+                    Just ( prev k, v )
 
                 else
                     Just ( k, v )
             )
-        |> Dict.fromList
+        |> Index.fromList
 
 
-removeCellStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellStyleRow : RowIndex -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict2 HLine_ Column_ LineStyle
 removeCellStyleRow rowIdx dict =
+    let
+        hAbove =
+            toInt (hLineAbove rowIdx)
+
+        hBelow =
+            toInt (hLineBelow rowIdx)
+    in
     dict
-        |> Dict.toList
+        |> toList2
         |> List.filterMap
-            (\( ( h, c ), v ) ->
-                if h == rowIdx || h == rowIdx + 1 then
+            (\( h, c, v ) ->
+                if toInt h == hAbove || toInt h == hBelow then
                     Nothing
 
-                else if h > rowIdx + 1 then
-                    Just ( ( h - 1, c ), v )
+                else if toInt h > hBelow then
+                    Just ( prev h, c, v )
 
                 else
-                    Just ( ( h, c ), v )
+                    Just ( h, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-removeCellVStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellVStyleRow : RowIndex -> IndexDict2 Row_ VLine_ LineStyle -> IndexDict2 Row_ VLine_ LineStyle
 removeCellVStyleRow rowIdx dict =
     dict
-        |> Dict.toList
+        |> toList2
         |> List.filterMap
-            (\( ( r, vi ), v ) ->
-                if r == rowIdx then
+            (\( r, vi, v ) ->
+                if toInt r == toInt rowIdx then
                     Nothing
 
-                else if r > rowIdx then
-                    Just ( ( r - 1, vi ), v )
+                else if toInt r > toInt rowIdx then
+                    Just ( prev r, vi, v )
 
                 else
-                    Just ( ( r, vi ), v )
+                    Just ( r, vi, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-removeCellStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellStyleCol : ColumnIndex -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict2 HLine_ Column_ LineStyle
 removeCellStyleCol colIdx dict =
     dict
-        |> Dict.toList
+        |> toList2
         |> List.filterMap
-            (\( ( h, c ), v ) ->
-                if c == colIdx then
+            (\( h, c, v ) ->
+                if toInt c == toInt colIdx then
                     Nothing
 
-                else if c > colIdx then
-                    Just ( ( h, c - 1 ), v )
+                else if toInt c > toInt colIdx then
+                    Just ( h, prev c, v )
 
                 else
-                    Just ( ( h, c ), v )
+                    Just ( h, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-removeCellVStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+removeCellVStyleCol : ColumnIndex -> IndexDict2 Row_ VLine_ LineStyle -> IndexDict2 Row_ VLine_ LineStyle
 removeCellVStyleCol colIdx dict =
+    let
+        vLeft =
+            toInt (vLineLeft colIdx)
+
+        vRight =
+            toInt (vLineRight colIdx)
+    in
     dict
-        |> Dict.toList
+        |> toList2
         |> List.filterMap
-            (\( ( r, vi ), v ) ->
-                if vi == colIdx || vi == colIdx + 1 then
+            (\( r, vi, v ) ->
+                if toInt vi == vLeft || toInt vi == vRight then
                     Nothing
 
-                else if vi > colIdx + 1 then
-                    Just ( ( r, vi - 1 ), v )
+                else if toInt vi > vRight then
+                    Just ( r, prev vi, v )
 
                 else
-                    Just ( ( r, vi ), v )
+                    Just ( r, vi, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-insertRow : Int -> Dict ( Int, Int ) String -> Dict ( Int, Int ) String
-insertRow idx cells =
+insertRowCells : RowIndex -> IndexDict2 Row_ Column_ String -> IndexDict2 Row_ Column_ String
+insertRowCells idx cells =
     cells
-        |> Dict.toList
+        |> toList2
         |> List.map
-            (\( ( r, c ), v ) ->
-                if r >= idx then
-                    ( ( r + 1, c ), v )
+            (\( r, c, v ) ->
+                if toInt r >= toInt idx then
+                    ( next r, c, v )
 
                 else
-                    ( ( r, c ), v )
+                    ( r, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-insertColumn : Int -> Dict ( Int, Int ) String -> Dict ( Int, Int ) String
-insertColumn idx cells =
+insertColumnCells : ColumnIndex -> IndexDict2 Row_ Column_ String -> IndexDict2 Row_ Column_ String
+insertColumnCells idx cells =
     cells
-        |> Dict.toList
+        |> toList2
         |> List.map
-            (\( ( r, c ), v ) ->
-                if c >= idx then
-                    ( ( r, c + 1 ), v )
+            (\( r, c, v ) ->
+                if toInt c >= toInt idx then
+                    ( r, next c, v )
 
                 else
-                    ( ( r, c ), v )
+                    ( r, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-insertColumnAlignments : Int -> Dict Int Alignment -> Dict Int Alignment
+insertColumnAlignments : ColumnIndex -> IndexDict Column_ Alignment -> IndexDict Column_ Alignment
 insertColumnAlignments idx alignments =
     alignments
-        |> Dict.toList
+        |> Index.toList
         |> List.map
             (\( c, a ) ->
-                if c >= idx then
-                    ( c + 1, a )
+                if toInt c >= toInt idx then
+                    ( next c, a )
 
                 else
                     ( c, a )
             )
-        |> Dict.fromList
+        |> Index.fromList
 
 
-insertIndexIntoDict : Int -> Dict Int a -> Dict Int a
+insertIndexIntoDict : Index a -> IndexDict a v -> IndexDict a v
 insertIndexIntoDict idx dict =
     dict
-        |> Dict.toList
+        |> Index.toList
         |> List.map
             (\( k, v ) ->
-                if k >= idx then
-                    ( k + 1, v )
+                if toInt k >= toInt idx then
+                    ( next k, v )
 
                 else
                     ( k, v )
             )
-        |> Dict.fromList
+        |> Index.fromList
 
 
-insertCellStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellStyleRow : RowIndex -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict2 HLine_ Column_ LineStyle
 insertCellStyleRow rowIdx dict =
     dict
-        |> Dict.toList
+        |> toList2
         |> List.map
-            (\( ( h, c ), v ) ->
-                if h > rowIdx then
-                    ( ( h + 1, c ), v )
+            (\( h, c, v ) ->
+                if toInt h > toInt (hLineAbove rowIdx) then
+                    ( next h, c, v )
 
                 else
-                    ( ( h, c ), v )
+                    ( h, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-insertCellVStyleRow : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellVStyleRow : RowIndex -> IndexDict2 Row_ VLine_ LineStyle -> IndexDict2 Row_ VLine_ LineStyle
 insertCellVStyleRow rowIdx dict =
     dict
-        |> Dict.toList
+        |> toList2
         |> List.map
-            (\( ( r, vi ), v ) ->
-                if r >= rowIdx then
-                    ( ( r + 1, vi ), v )
+            (\( r, vi, v ) ->
+                if toInt r >= toInt rowIdx then
+                    ( next r, vi, v )
 
                 else
-                    ( ( r, vi ), v )
+                    ( r, vi, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-insertCellStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellStyleCol : ColumnIndex -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict2 HLine_ Column_ LineStyle
 insertCellStyleCol colIdx dict =
     dict
-        |> Dict.toList
+        |> toList2
         |> List.map
-            (\( ( h, c ), v ) ->
-                if c >= colIdx then
-                    ( ( h, c + 1 ), v )
+            (\( h, c, v ) ->
+                if toInt c >= toInt colIdx then
+                    ( h, next c, v )
 
                 else
-                    ( ( h, c ), v )
+                    ( h, c, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-insertCellVStyleCol : Int -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle
+insertCellVStyleCol : ColumnIndex -> IndexDict2 Row_ VLine_ LineStyle -> IndexDict2 Row_ VLine_ LineStyle
 insertCellVStyleCol colIdx dict =
     dict
-        |> Dict.toList
+        |> toList2
         |> List.map
-            (\( ( r, vi ), v ) ->
-                if vi > colIdx then
-                    ( ( r, vi + 1 ), v )
+            (\( r, vi, v ) ->
+                if toInt vi > toInt (vLineLeft colIdx) then
+                    ( r, next vi, v )
 
                 else
-                    ( ( r, vi ), v )
+                    ( r, vi, v )
             )
-        |> Dict.fromList
+        |> fromList2
 
 
-getHorizontalLineStyle : Int -> Dict Int LineStyle -> LineStyle
+getHorizontalLineStyle : HLineIndex -> IndexDict HLine_ LineStyle -> LineStyle
 getHorizontalLineStyle idx styles =
-    Dict.get idx styles |> Maybe.withDefault Thin
+    Index.get idx styles |> Maybe.withDefault Thin
 
 
-getVerticalLineStyle : Int -> Dict Int LineStyle -> LineStyle
+getVerticalLineStyle : VLineIndex -> IndexDict VLine_ LineStyle -> LineStyle
 getVerticalLineStyle idx styles =
-    Dict.get idx styles |> Maybe.withDefault Thin
+    Index.get idx styles |> Maybe.withDefault Thin
 
 
-getEffectiveHStyle : Int -> Int -> Dict ( Int, Int ) LineStyle -> Dict Int LineStyle -> LineStyle
+getEffectiveHStyle : HLineIndex -> ColumnIndex -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict HLine_ LineStyle -> LineStyle
 getEffectiveHStyle hIdx col cellStyles rowStyles =
-    case Dict.get ( hIdx, col ) cellStyles of
+    case get2 hIdx col cellStyles of
         Just s ->
             s
 
@@ -609,9 +624,9 @@ getEffectiveHStyle hIdx col cellStyles rowStyles =
             getHorizontalLineStyle hIdx rowStyles
 
 
-getEffectiveVStyle : Int -> Int -> Dict ( Int, Int ) LineStyle -> Dict Int LineStyle -> LineStyle
+getEffectiveVStyle : RowIndex -> VLineIndex -> IndexDict2 Row_ VLine_ LineStyle -> IndexDict VLine_ LineStyle -> LineStyle
 getEffectiveVStyle row vIdx cellStyles colStyles =
-    case Dict.get ( row, vIdx ) cellStyles of
+    case get2 row vIdx cellStyles of
         Just s ->
             s
 
@@ -981,28 +996,28 @@ lineStyleLabel style =
             "Double"
 
 
-hSepLabel : Int -> Int -> String
+hSepLabel : HLineIndex -> RowCount -> String
 hSepLabel idx rows =
-    if idx == 0 then
+    if toInt idx == 0 then
         "Top border"
 
-    else if idx == rows then
+    else if toInt idx == countToInt rows then
         "Bottom border"
 
     else
-        "Row " ++ String.fromInt idx ++ "-" ++ String.fromInt (idx + 1)
+        "Row " ++ String.fromInt (toInt idx) ++ "-" ++ String.fromInt (toInt idx + 1)
 
 
-vSepLabel : Int -> Int -> String
+vSepLabel : VLineIndex -> ColumnCount -> String
 vSepLabel idx cols =
-    if idx == 0 then
+    if toInt idx == 0 then
         "Left border"
 
-    else if idx == cols then
+    else if toInt idx == countToInt cols then
         "Right border"
 
     else
-        "Col " ++ String.fromInt idx ++ "-" ++ String.fromInt (idx + 1)
+        "Col " ++ String.fromInt (toInt idx) ++ "-" ++ String.fromInt (toInt idx + 1)
 
 
 lineStyleToCss : LineStyle -> String
@@ -1081,7 +1096,7 @@ escapePipe s =
 -- IMPORT PARSING
 
 
-parseImportData : String -> { rows : Int, cols : Int, cells : Dict ( Int, Int ) String }
+parseImportData : String -> { rows : RowCount, cols : ColumnCount, cells : IndexDict2 Row_ Column_ String }
 parseImportData input =
     let
         trimmed =
@@ -1114,30 +1129,30 @@ parseImportData input =
             parsedRows
                 |> List.indexedMap
                     (\r row ->
-                        List.indexedMap (\c val -> ( ( r, c ), val )) row
+                        List.indexedMap (\c val -> ( index r, index c, val )) row
                     )
                 |> List.concat
-                |> Dict.fromList
+                |> fromList2
     in
-    { rows = numRows, cols = numCols, cells = cells }
+    { rows = count numRows, cols = count numCols, cells = cells }
 
 
 
 -- MARKDOWN GENERATION
 
 
-generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> String
+generateMarkdown : OutputFormat -> RowCount -> ColumnCount -> IndexDict2 Row_ Column_ String -> IndexDict Column_ Alignment -> IndexDict Column_ Alignment -> String
 generateMarkdown format rows cols cells headerAlignments bodyAlignments =
-    if rows == 0 || cols == 0 then
+    if countToInt rows == 0 || countToInt cols == 0 then
         ""
 
     else
         let
             colRange =
-                List.range 0 (cols - 1)
+                rangeCount cols
 
             rowRange =
-                List.range 0 (rows - 1)
+                rangeCount rows
 
             colWidths =
                 List.map
@@ -1155,14 +1170,14 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments =
             formatRow r =
                 let
                     rowAlignments =
-                        if r == 0 then
+                        if toInt r == 0 then
                             headerAlignments
 
                         else
                             bodyAlignments
 
                     getRowAlignment =
-                        if r == 0 then
+                        if toInt r == 0 then
                             getHeaderAlignment
 
                         else
@@ -1222,10 +1237,10 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments =
                     ++ " |"
 
             headerRow =
-                formatRow 0
+                formatRow (index 0)
 
             dataRows =
-                List.map formatRow (List.range 1 (rows - 1))
+                List.map formatRow (rangeFrom (index 1) (countMinusOne rows))
         in
         String.join "\n" (headerRow :: separatorRow :: dataRows)
 
@@ -1234,18 +1249,18 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments =
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
+generateBoxDrawing : RowCount -> ColumnCount -> IndexDict2 Row_ Column_ String -> IndexDict Column_ Alignment -> IndexDict Column_ Alignment -> IndexDict HLine_ LineStyle -> IndexDict VLine_ LineStyle -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict2 Row_ VLine_ LineStyle -> String
 generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles =
-    if rows == 0 || cols == 0 then
+    if countToInt rows == 0 || countToInt cols == 0 then
         ""
 
     else
         let
             colRange =
-                List.range 0 (cols - 1)
+                rangeCount cols
 
             rowRange =
-                List.range 0 (rows - 1)
+                rangeCount rows
 
             colWidths =
                 List.map
@@ -1276,84 +1291,84 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                             (\vIdx ->
                                 let
                                     up =
-                                        if hIdx > 0 then
-                                            lineStyleWeight (effV (hIdx - 1) vIdx)
+                                        if toInt hIdx > 0 then
+                                            lineStyleWeight (effV (index (toInt hIdx - 1)) vIdx)
 
                                         else
                                             WNone
 
                                     down =
-                                        if hIdx < rows then
-                                            lineStyleWeight (effV hIdx vIdx)
+                                        if toInt hIdx < countToInt rows then
+                                            lineStyleWeight (effV (index (toInt hIdx)) vIdx)
 
                                         else
                                             WNone
 
                                     left =
-                                        lineStyleWeight (effH hIdx (vIdx - 1))
+                                        lineStyleWeight (effH hIdx (index (toInt vIdx - 1)))
 
                                     right =
-                                        lineStyleWeight (effH hIdx vIdx)
+                                        lineStyleWeight (effH hIdx (index (toInt vIdx)))
                                 in
                                 lookupCorner up down left right
                             )
-                            (List.range 1 (cols - 1))
+                            (innerVLineRange cols)
 
                     leftCorner =
                         let
                             up =
-                                if hIdx > 0 then
-                                    lineStyleWeight (effV (hIdx - 1) 0)
+                                if toInt hIdx > 0 then
+                                    lineStyleWeight (effV (index (toInt hIdx - 1)) (index 0))
 
                                 else
                                     WNone
 
                             down =
-                                if hIdx < rows then
-                                    lineStyleWeight (effV hIdx 0)
+                                if toInt hIdx < countToInt rows then
+                                    lineStyleWeight (effV (index (toInt hIdx)) (index 0))
 
                                 else
                                     WNone
                         in
-                        lookupCorner up down WNone (lineStyleWeight (effH hIdx 0))
+                        lookupCorner up down WNone (lineStyleWeight (effH hIdx (index 0)))
 
                     rightCorner =
                         let
                             up =
-                                if hIdx > 0 then
-                                    lineStyleWeight (effV (hIdx - 1) cols)
+                                if toInt hIdx > 0 then
+                                    lineStyleWeight (effV (index (toInt hIdx - 1)) (lastVLine cols))
 
                                 else
                                     WNone
 
                             down =
-                                if hIdx < rows then
-                                    lineStyleWeight (effV hIdx cols)
+                                if toInt hIdx < countToInt rows then
+                                    lineStyleWeight (effV (index (toInt hIdx)) (lastVLine cols))
 
                                 else
                                     WNone
                         in
-                        lookupCorner up down (lineStyleWeight (effH hIdx (cols - 1))) WNone
+                        lookupCorner up down (lineStyleWeight (effH hIdx (index (countToInt cols - 1)))) WNone
                 in
                 leftCorner ++ String.concat (interleave segments intersections) ++ rightCorner
 
             formatRow r =
                 let
                     leftV =
-                        verticalChar (effV r 0)
+                        verticalChar (effV r (index 0))
 
                     rightV =
-                        verticalChar (effV r cols)
+                        verticalChar (effV r (lastVLine cols))
 
                     getRowAlignment =
-                        if r == 0 then
+                        if toInt r == 0 then
                             getHeaderAlignment
 
                         else
                             getBodyAlignment
 
                     rowAlignments =
-                        if r == 0 then
+                        if toInt r == 0 then
                             headerAlignments
 
                         else
@@ -1372,21 +1387,21 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                     innerSeps =
                         List.map
                             (\vIdx -> verticalChar (effV r vIdx))
-                            (List.range 1 (cols - 1))
+                            (innerVLineRange cols)
                 in
                 leftV ++ " " ++ String.concat (interleave cellTexts (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
 
             allRows =
                 List.concatMap
                     (\r ->
-                        if r == 0 then
-                            [ horizontalLine 0, formatRow r ]
+                        if toInt r == 0 then
+                            [ horizontalLine (index 0), formatRow r ]
 
                         else
-                            [ horizontalLine r, formatRow r ]
+                            [ horizontalLine (index (toInt r)), formatRow r ]
                     )
                     rowRange
-                    ++ [ horizontalLine rows ]
+                    ++ [ horizontalLine (lastHLine rows) ]
         in
         String.join "\n" allRows
 
@@ -1421,15 +1436,15 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
+generateHtmlTable : RowCount -> ColumnCount -> IndexDict2 Row_ Column_ String -> IndexDict Column_ Alignment -> IndexDict Column_ Alignment -> IndexDict HLine_ LineStyle -> IndexDict VLine_ LineStyle -> IndexDict2 HLine_ Column_ LineStyle -> IndexDict2 Row_ VLine_ LineStyle -> String
 generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles =
-    if rows == 0 || cols == 0 then
+    if countToInt rows == 0 || countToInt cols == 0 then
         ""
 
     else
         let
             colRange =
-                List.range 0 (cols - 1)
+                rangeCount cols
 
             indent n =
                 String.repeat n "  "
@@ -1444,16 +1459,16 @@ generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyle
             cellBorderStyle r c =
                 let
                     top =
-                        getEffectiveHStyle r c cellHStyles hStyles
+                        getEffectiveHStyle (hLineAbove r) c cellHStyles hStyles
 
                     bottom =
-                        getEffectiveHStyle (r + 1) c cellHStyles hStyles
+                        getEffectiveHStyle (hLineBelow r) c cellHStyles hStyles
 
                     left =
-                        getEffectiveVStyle r c cellVStyles vStyles
+                        getEffectiveVStyle r (vLineLeft c) cellVStyles vStyles
 
                     right =
-                        getEffectiveVStyle r (c + 1) cellVStyles vStyles
+                        getEffectiveVStyle r (vLineRight c) cellVStyles vStyles
 
                     parts =
                         List.filterMap identity
@@ -1509,7 +1524,7 @@ generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyle
                             align =
                                 getHeaderAlignment c headerAlignments
                         in
-                        indent 3 ++ "<th" ++ cellStyleAttr 0 c align ++ ">" ++ escapeHtml (getCell 0 c cells) ++ "</th>"
+                        indent 3 ++ "<th" ++ cellStyleAttr (index 0) c align ++ ">" ++ escapeHtml (getCell (index 0) c cells) ++ "</th>"
                     )
                     colRange
 
@@ -1538,10 +1553,10 @@ generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyle
                 (indent 2 ++ "<tr>") :: rowCells ++ [ indent 2 ++ "</tr>" ]
 
             bodyRows =
-                List.concatMap bodyRow (List.range 1 (rows - 1))
+                List.concatMap bodyRow (rangeFrom (index 1) (countMinusOne rows))
 
             bodySection =
-                if rows > 1 then
+                if countIsGreaterThan 1 rows then
                     (indent 1 ++ "<tbody>") :: bodyRows ++ [ indent 1 ++ "</tbody>" ]
 
                 else
@@ -2122,16 +2137,16 @@ viewTableEditor : Model -> Html FrontendMsg
 viewTableEditor model =
     let
         colRange =
-            List.range 0 (model.cols - 1)
+            rangeCount model.cols
 
         rowRange =
-            List.range 0 (model.rows - 1)
+            rangeCount model.rows
 
         canDeleteCol =
-            model.cols > 1
+            countIsGreaterThan 1 model.cols
 
         canDeleteRow =
-            model.rows > 1
+            countIsGreaterThan 1 model.rows
 
         colPillRow =
             tr []
@@ -2143,16 +2158,16 @@ viewTableEditor model =
                                     td [ Attr.style "text-align" "center" ]
                                         [ div [ Attr.class "btn-pill" ]
                                             [ button
-                                                [ Attr.id ("insert-col-" ++ String.fromInt c)
+                                                [ Attr.id ("insert-col-" ++ indexToString c)
                                                 , Attr.class "pill-add-btn"
-                                                , Attr.title ("Insert column before column " ++ String.fromInt (c + 1))
+                                                , Attr.title ("Insert column before column " ++ String.fromInt (toInt c + 1))
                                                 , onClick (InsertColumn c)
                                                 ]
                                                 [ text "+" ]
                                             , button
-                                                [ Attr.id ("del-col-" ++ String.fromInt c)
+                                                [ Attr.id ("del-col-" ++ indexToString c)
                                                 , Attr.class "pill-del-btn"
-                                                , Attr.title ("Remove column " ++ String.fromInt (c + 1))
+                                                , Attr.title ("Remove column " ++ String.fromInt (toInt c + 1))
                                                 , onClick (RemoveColumn c)
                                                 , Attr.disabled (not canDeleteCol)
                                                 ]
@@ -2160,7 +2175,7 @@ viewTableEditor model =
                                             ]
                                         ]
                             in
-                            if c < model.cols - 1 then
+                            if toInt c < countToInt model.cols - 1 then
                                 [ pillTd, td [ Attr.class "vsep-cell" ] [] ]
 
                             else
@@ -2172,7 +2187,7 @@ viewTableEditor model =
 
         headerAlignmentRow =
             tr []
-                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
+                (td [ Attr.style "text-align" "center" ] [ vsepButton (index 0) ]
                     :: List.concatMap
                         (\c ->
                             let
@@ -2181,7 +2196,7 @@ viewTableEditor model =
 
                                 alignBtn align idSuffix label icon =
                                     button
-                                        [ Attr.id ("halign-" ++ String.fromInt c ++ "-" ++ idSuffix)
+                                        [ Attr.id ("halign-" ++ indexToString c ++ "-" ++ idSuffix)
                                         , Attr.class
                                             (if currentAlign == align then
                                                 "align-btn active"
@@ -2203,14 +2218,14 @@ viewTableEditor model =
                                             ]
                                         ]
                             in
-                            if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
+                            if toInt c < countToInt model.cols - 1 then
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (vLineRight c) ] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
+                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton (lastVLine model.cols) ] ]
                 )
 
         bodyAlignmentRow =
@@ -2224,7 +2239,7 @@ viewTableEditor model =
 
                                 alignBtn align idSuffix label icon =
                                     button
-                                        [ Attr.id ("balign-" ++ String.fromInt c ++ "-" ++ idSuffix)
+                                        [ Attr.id ("balign-" ++ indexToString c ++ "-" ++ idSuffix)
                                         , Attr.class
                                             (if currentAlign == align then
                                                 "align-btn active"
@@ -2246,7 +2261,7 @@ viewTableEditor model =
                                             ]
                                         ]
                             in
-                            if c < model.cols - 1 then
+                            if toInt c < countToInt model.cols - 1 then
                                 [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
 
                             else
@@ -2299,7 +2314,7 @@ viewTableEditor model =
                                                  else
                                                     "hsep-btn"
                                                 )
-                                            , Attr.title (hSepLabel hIdx model.rows ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
+                                            , Attr.title (hSepLabel hIdx model.rows ++ " col " ++ String.fromInt (toInt c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
                                             , onClick (CycleCellHorizontalStyle hIdx c)
                                             ]
                                             [ div
@@ -2316,7 +2331,7 @@ viewTableEditor model =
                                             ]
                                         ]
                             in
-                            if c < model.cols - 1 then
+                            if toInt c < countToInt model.cols - 1 then
                                 [ segmentTd, td [ Attr.class "vsep-cell", Attr.style "padding" "0" ] [] ]
 
                             else
@@ -2335,9 +2350,9 @@ viewTableEditor model =
                                 cellTd =
                                     td []
                                         [ input
-                                            [ Attr.id ("cell-" ++ String.fromInt r ++ "-" ++ String.fromInt c)
+                                            [ Attr.id ("cell-" ++ indexToString r ++ "-" ++ indexToString c)
                                             , Attr.class
-                                                (if r == 0 then
+                                                (if toInt r == 0 then
                                                     "cell-input header-cell"
 
                                                  else
@@ -2345,8 +2360,8 @@ viewTableEditor model =
                                                 )
                                             , Attr.value (getCell r c model.cells)
                                             , Attr.placeholder
-                                                (if r == 0 then
-                                                    "Header " ++ String.fromInt (c + 1)
+                                                (if toInt r == 0 then
+                                                    "Header " ++ String.fromInt (toInt c + 1)
 
                                                  else
                                                     ""
@@ -2357,10 +2372,10 @@ viewTableEditor model =
                                             []
                                         ]
                             in
-                            if c < model.cols - 1 then
+                            if toInt c < countToInt model.cols - 1 then
                                 let
                                     vIdx =
-                                        c + 1
+                                        vLineRight c
 
                                     effectiveStyle =
                                         getEffectiveVStyle r vIdx model.cellVerticalStyles model.verticalLineStyles
@@ -2375,7 +2390,7 @@ viewTableEditor model =
                                              else
                                                 "vsep-inline-btn"
                                             )
-                                        , Attr.title (vSepLabel vIdx model.cols ++ " row " ++ String.fromInt (r + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
+                                        , Attr.title (vSepLabel vIdx model.cols ++ " row " ++ String.fromInt (toInt r + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
                                         , onClick (CycleCellVerticalStyle r vIdx)
                                         ]
                                         [ text
@@ -2396,16 +2411,16 @@ viewTableEditor model =
                     ++ [ td [ Attr.style "vertical-align" "middle" ]
                             [ div [ Attr.class "btn-pill" ]
                                 [ button
-                                    [ Attr.id ("insert-row-" ++ String.fromInt r)
+                                    [ Attr.id ("insert-row-" ++ indexToString r)
                                     , Attr.class "pill-add-btn"
-                                    , Attr.title ("Insert row before row " ++ String.fromInt (r + 1))
+                                    , Attr.title ("Insert row before row " ++ String.fromInt (toInt r + 1))
                                     , onClick (InsertRow r)
                                     ]
                                     [ text "+" ]
                                 , button
-                                    [ Attr.id ("del-row-" ++ String.fromInt r)
+                                    [ Attr.id ("del-row-" ++ indexToString r)
                                     , Attr.class "pill-del-btn"
-                                    , Attr.title ("Remove row " ++ String.fromInt (r + 1))
+                                    , Attr.title ("Remove row " ++ String.fromInt (toInt r + 1))
                                     , onClick (RemoveRow r)
                                     , Attr.disabled (not canDeleteRow)
                                     ]
@@ -2417,15 +2432,9 @@ viewTableEditor model =
 
         bodyRows =
             List.concatMap
-                (\r ->
-                    if r == 0 then
-                        [ hSepRow 0, dataRow r ]
-
-                    else
-                        [ hSepRow r, dataRow r ]
-                )
+                (\r -> [ hSepRow (hLineAbove r), dataRow r ])
                 rowRange
-                ++ [ hSepRow model.rows, colPillRow ]
+                ++ [ hSepRow (lastHLine model.rows), colPillRow ]
 
         vsepButton vIdx =
             let
@@ -2451,7 +2460,6 @@ viewTableEditor model =
                         verticalChar style
                     )
                 ]
-
     in
     div [ Attr.class "table-container" ]
         [ if model.showImport then
@@ -2578,7 +2586,7 @@ viewMarkdownOutput model =
                         , Attr.id "md-output"
                         , Attr.readonly True
                         , Attr.value markdown
-                        , Attr.rows (max 4 (model.rows + 2))
+                        , Attr.rows (max 4 (countToInt model.rows + 2))
                         ]
                         []
                     ]
@@ -2590,28 +2598,28 @@ viewRenderedTable : Model -> Html FrontendMsg
 viewRenderedTable model =
     let
         colRange =
-            List.range 0 (model.cols - 1)
+            rangeCount model.cols
 
         cellAttrs r c =
             let
                 align =
-                    if r == 0 then
+                    if toInt r == 0 then
                         getHeaderAlignment c model.headerAlignments
 
                     else
                         getBodyAlignment c model.bodyAlignments
 
                 top =
-                    getEffectiveHStyle r c model.cellHorizontalStyles model.horizontalLineStyles
+                    getEffectiveHStyle (hLineAbove r) c model.cellHorizontalStyles model.horizontalLineStyles
 
                 bottom =
-                    getEffectiveHStyle (r + 1) c model.cellHorizontalStyles model.horizontalLineStyles
+                    getEffectiveHStyle (hLineBelow r) c model.cellHorizontalStyles model.horizontalLineStyles
 
                 left =
-                    getEffectiveVStyle r c model.cellVerticalStyles model.verticalLineStyles
+                    getEffectiveVStyle r (vLineLeft c) model.cellVerticalStyles model.verticalLineStyles
 
                 right =
-                    getEffectiveVStyle r (c + 1) model.cellVerticalStyles model.verticalLineStyles
+                    getEffectiveVStyle r (vLineRight c) model.cellVerticalStyles model.verticalLineStyles
 
                 borderAttrs =
                     List.filterMap identity
@@ -2643,7 +2651,7 @@ viewRenderedTable model =
             tr []
                 (List.map
                     (\c ->
-                        th (cellAttrs 0 c) [ text (getCell 0 c model.cells) ]
+                        th (cellAttrs (index 0) c) [ text (getCell (index 0) c model.cells) ]
                     )
                     colRange
                 )
@@ -2659,7 +2667,7 @@ viewRenderedTable model =
                             colRange
                         )
                 )
-                (List.range 1 (model.rows - 1))
+                (rangeFrom (index 1) (countMinusOne model.rows))
 
         collapsed =
             SeqSet.member PreviewSection model.collapsedSections
@@ -2746,7 +2754,7 @@ viewHtmlTableOutput model =
                         , Attr.id "html-output"
                         , Attr.readonly True
                         , Attr.value htmlTable
-                        , Attr.rows (max 4 (model.rows + 6))
+                        , Attr.rows (max 4 (countToInt model.rows + 6))
                         ]
                         []
                     ]
@@ -2797,7 +2805,7 @@ viewBoxDrawingOutput model =
                         , Attr.id "box-output"
                         , Attr.readonly True
                         , Attr.value boxDrawing
-                        , Attr.rows (max 4 (model.rows * 2 + 1))
+                        , Attr.rows (max 4 (countToInt model.rows * 2 + 1))
                         ]
                         []
                     ]

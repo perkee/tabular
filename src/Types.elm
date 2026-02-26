@@ -1,36 +1,36 @@
 module Types exposing (..)
 
 import Browser
-import Dict exposing (Dict)
 import Effect.Browser.Navigation
+import Index exposing (..)
 import SeqSet exposing (SeqSet)
 import Url exposing (Url)
 
 
 type alias TableSnapshot =
-    { rows : Int
-    , cols : Int
-    , cells : Dict ( Int, Int ) String
-    , headerAlignments : Dict Int Alignment
-    , bodyAlignments : Dict Int Alignment
-    , horizontalLineStyles : Dict Int LineStyle
-    , verticalLineStyles : Dict Int LineStyle
-    , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
-    , cellVerticalStyles : Dict ( Int, Int ) LineStyle
+    { rows : RowCount
+    , cols : ColumnCount
+    , cells : IndexDict2 Row_ Column_ String
+    , headerAlignments : IndexDict Column_ Alignment
+    , bodyAlignments : IndexDict Column_ Alignment
+    , horizontalLineStyles : IndexDict HLine_ LineStyle
+    , verticalLineStyles : IndexDict VLine_ LineStyle
+    , cellHorizontalStyles : IndexDict2 HLine_ Column_ LineStyle
+    , cellVerticalStyles : IndexDict2 Row_ VLine_ LineStyle
     }
 
 
 type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
-    , rows : Int
-    , cols : Int
-    , cells : Dict ( Int, Int ) String
-    , headerAlignments : Dict Int Alignment
-    , bodyAlignments : Dict Int Alignment
-    , horizontalLineStyles : Dict Int LineStyle
-    , verticalLineStyles : Dict Int LineStyle
-    , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
-    , cellVerticalStyles : Dict ( Int, Int ) LineStyle
+    , rows : RowCount
+    , cols : ColumnCount
+    , cells : IndexDict2 Row_ Column_ String
+    , headerAlignments : IndexDict Column_ Alignment
+    , bodyAlignments : IndexDict Column_ Alignment
+    , horizontalLineStyles : IndexDict HLine_ LineStyle
+    , verticalLineStyles : IndexDict VLine_ LineStyle
+    , cellHorizontalStyles : IndexDict2 HLine_ Column_ LineStyle
+    , cellVerticalStyles : IndexDict2 Row_ VLine_ LineStyle
     , outputFormat : OutputFormat
     , showImport : Bool
     , importText : String
@@ -85,23 +85,23 @@ type alias BackendModel =
 type FrontendMsg
     = UrlClicked Browser.UrlRequest
     | UrlChanged Url
-    | CellChanged Int Int String
+    | CellChanged RowIndex ColumnIndex String
     | AddRow
     | AddColumn
-    | RemoveRow Int
-    | RemoveColumn Int
-    | InsertRow Int
-    | InsertColumn Int
+    | RemoveRow RowIndex
+    | RemoveColumn ColumnIndex
+    | InsertRow RowIndex
+    | InsertColumn ColumnIndex
     | SetOutputFormat OutputFormat
-    | SetHeaderAlignment Int Alignment
-    | SetBodyAlignment Int Alignment
+    | SetHeaderAlignment ColumnIndex Alignment
+    | SetBodyAlignment ColumnIndex Alignment
     | ToggleImport
     | ImportTextChanged String
     | ImportData
-    | CycleHorizontalLineStyle Int
-    | CycleVerticalLineStyle Int
-    | CycleCellHorizontalStyle Int Int
-    | CycleCellVerticalStyle Int Int
+    | CycleHorizontalLineStyle HLineIndex
+    | CycleVerticalLineStyle VLineIndex
+    | CycleCellHorizontalStyle HLineIndex ColumnIndex
+    | CycleCellVerticalStyle RowIndex VLineIndex
     | ToggleSection OutputSection
     | Undo
 
