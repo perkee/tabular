@@ -49,7 +49,8 @@ init _ key =
                 , ( ( 0, 1 ), "Header 2" )
                 , ( ( 0, 2 ), "Header 3" )
                 ]
-      , alignments = Dict.empty
+      , headerAlignments = Dict.empty
+      , bodyAlignments = Dict.empty
       , horizontalLineStyles = Dict.empty
       , verticalLineStyles = Dict.empty
       , cellHorizontalStyles = Dict.empty
@@ -69,7 +70,8 @@ snapshot model =
     { rows = model.rows
     , cols = model.cols
     , cells = model.cells
-    , alignments = model.alignments
+    , headerAlignments = model.headerAlignments
+    , bodyAlignments = model.bodyAlignments
     , horizontalLineStyles = model.horizontalLineStyles
     , verticalLineStyles = model.verticalLineStyles
     , cellHorizontalStyles = model.cellHorizontalStyles
@@ -128,7 +130,8 @@ update msg model =
                 ( { model
                     | cols = model.cols - 1
                     , cells = removeColumn colIndex model.cells
-                    , alignments = removeColumnAlignments colIndex model.alignments
+                    , headerAlignments = removeColumnAlignments colIndex model.headerAlignments
+                    , bodyAlignments = removeColumnAlignments colIndex model.bodyAlignments
                     , verticalLineStyles = removeIndexFromDict (colIndex + 1) model.verticalLineStyles
                     , cellHorizontalStyles = removeCellStyleCol colIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleCol colIndex model.cellVerticalStyles
@@ -156,7 +159,8 @@ update msg model =
             ( { model
                 | cols = model.cols + 1
                 , cells = insertColumn index model.cells
-                , alignments = insertColumnAlignments index model.alignments
+                , headerAlignments = insertColumnAlignments index model.headerAlignments
+                , bodyAlignments = insertColumnAlignments index model.bodyAlignments
                 , verticalLineStyles = insertIndexIntoDict (index + 1) model.verticalLineStyles
                 , cellHorizontalStyles = insertCellStyleCol index model.cellHorizontalStyles
                 , cellVerticalStyles = insertCellVStyleCol index model.cellVerticalStyles
@@ -168,8 +172,13 @@ update msg model =
         SetOutputFormat format ->
             ( { model | outputFormat = format }, Command.none )
 
-        SetAlignment col alignment ->
-            ( { model | alignments = Dict.insert col alignment model.alignments }
+        SetHeaderAlignment col alignment ->
+            ( { model | headerAlignments = Dict.insert col alignment model.headerAlignments }
+            , Command.none
+            )
+
+        SetBodyAlignment col alignment ->
+            ( { model | bodyAlignments = Dict.insert col alignment model.bodyAlignments }
             , Command.none
             )
 
@@ -191,7 +200,8 @@ update msg model =
                     | rows = parsed.rows
                     , cols = parsed.cols
                     , cells = parsed.cells
-                    , alignments = Dict.empty
+                    , headerAlignments = Dict.empty
+                    , bodyAlignments = Dict.empty
                     , horizontalLineStyles = Dict.empty
                     , verticalLineStyles = Dict.empty
                     , cellHorizontalStyles = Dict.empty
@@ -263,7 +273,8 @@ update msg model =
                         | rows = s.rows
                         , cols = s.cols
                         , cells = s.cells
-                        , alignments = s.alignments
+                        , headerAlignments = s.headerAlignments
+                        , bodyAlignments = s.bodyAlignments
                         , horizontalLineStyles = s.horizontalLineStyles
                         , verticalLineStyles = s.verticalLineStyles
                         , cellHorizontalStyles = s.cellHorizontalStyles
@@ -358,8 +369,13 @@ removeColumnAlignments colToRemove alignments =
         |> Dict.fromList
 
 
-getAlignment : Int -> Dict Int Alignment -> Alignment
-getAlignment col alignments =
+getHeaderAlignment : Int -> Dict Int Alignment -> Alignment
+getHeaderAlignment col alignments =
+    Dict.get col alignments |> Maybe.withDefault AlignCenter
+
+
+getBodyAlignment : Int -> Dict Int Alignment -> Alignment
+getBodyAlignment col alignments =
     Dict.get col alignments |> Maybe.withDefault AlignLeft
 
 
@@ -1110,8 +1126,8 @@ parseImportData input =
 -- MARKDOWN GENERATION
 
 
-generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> String
-generateMarkdown format rows cols cells alignments =
+generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> String
+generateMarkdown format rows cols cells headerAlignments bodyAlignments =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1138,6 +1154,20 @@ generateMarkdown format rows cols cells alignments =
 
             formatRow r =
                 let
+                    rowAlignments =
+                        if r == 0 then
+                            headerAlignments
+
+                        else
+                            bodyAlignments
+
+                    getRowAlignment =
+                        if r == 0 then
+                            getHeaderAlignment
+
+                        else
+                            getBodyAlignment
+
                     cellTexts =
                         case format of
                             Compact ->
@@ -1148,7 +1178,7 @@ generateMarkdown format rows cols cells alignments =
                             Expanded ->
                                 List.map2
                                     (\c w ->
-                                        padContent (getAlignment c alignments)
+                                        padContent (getRowAlignment c rowAlignments)
                                             (escapePipe (getCell r c cells))
                                             w
                                     )
@@ -1184,7 +1214,7 @@ generateMarkdown format rows cols cells alignments =
             separatorRow =
                 "| "
                     ++ (List.map2
-                            (\c w -> separatorCell (getAlignment c alignments) w)
+                            (\c w -> separatorCell (getBodyAlignment c bodyAlignments) w)
                             colRange
                             colWidths
                             |> String.join " | "
@@ -1204,8 +1234,8 @@ generateMarkdown format rows cols cells alignments =
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
-generateBoxDrawing rows cols cells alignments hStyles vStyles cellHStyles cellVStyles =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
+generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1315,10 +1345,24 @@ generateBoxDrawing rows cols cells alignments hStyles vStyles cellHStyles cellVS
                     rightV =
                         verticalChar (effV r cols)
 
+                    getRowAlignment =
+                        if r == 0 then
+                            getHeaderAlignment
+
+                        else
+                            getBodyAlignment
+
+                    rowAlignments =
+                        if r == 0 then
+                            headerAlignments
+
+                        else
+                            bodyAlignments
+
                     cellTexts =
                         List.map2
                             (\c w ->
-                                padContent (getAlignment c alignments)
+                                padContent (getRowAlignment c rowAlignments)
                                     (getCell r c cells)
                                     w
                             )
@@ -1377,8 +1421,8 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
-generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVStyles =
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
+generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1463,7 +1507,7 @@ generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVSt
                     (\c ->
                         let
                             align =
-                                getAlignment c alignments
+                                getHeaderAlignment c headerAlignments
                         in
                         indent 3 ++ "<th" ++ cellStyleAttr 0 c align ++ ">" ++ escapeHtml (getCell 0 c cells) ++ "</th>"
                     )
@@ -1485,7 +1529,7 @@ generateHtmlTable rows cols cells alignments hStyles vStyles cellHStyles cellVSt
                             (\c ->
                                 let
                                     align =
-                                        getAlignment c alignments
+                                        getBodyAlignment c bodyAlignments
                                 in
                                 indent 3 ++ "<td" ++ cellStyleAttr r c align ++ ">" ++ escapeHtml (getCell r c cells) ++ "</td>"
                             )
@@ -2126,18 +2170,18 @@ viewTableEditor model =
                     ++ [ td [] [] ]
                 )
 
-        alignmentRow =
+        headerAlignmentRow =
             tr []
                 (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
                     :: List.concatMap
                         (\c ->
                             let
                                 currentAlign =
-                                    getAlignment c model.alignments
+                                    getHeaderAlignment c model.headerAlignments
 
                                 alignBtn align idSuffix label icon =
                                     button
-                                        [ Attr.id ("align-" ++ String.fromInt c ++ "-" ++ idSuffix)
+                                        [ Attr.id ("halign-" ++ String.fromInt c ++ "-" ++ idSuffix)
                                         , Attr.class
                                             (if currentAlign == align then
                                                 "align-btn active"
@@ -2145,8 +2189,8 @@ viewTableEditor model =
                                              else
                                                 "align-btn"
                                             )
-                                        , onClick (SetAlignment c align)
-                                        , Attr.title label
+                                        , onClick (SetHeaderAlignment c align)
+                                        , Attr.title ("Header: " ++ label)
                                         ]
                                         [ icon ]
 
@@ -2167,6 +2211,49 @@ viewTableEditor model =
                         )
                         colRange
                     ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
+                )
+
+        bodyAlignmentRow =
+            tr []
+                (td [] []
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                currentAlign =
+                                    getBodyAlignment c model.bodyAlignments
+
+                                alignBtn align idSuffix label icon =
+                                    button
+                                        [ Attr.id ("balign-" ++ String.fromInt c ++ "-" ++ idSuffix)
+                                        , Attr.class
+                                            (if currentAlign == align then
+                                                "align-btn active"
+
+                                             else
+                                                "align-btn"
+                                            )
+                                        , onClick (SetBodyAlignment c align)
+                                        , Attr.title ("Body: " ++ label)
+                                        ]
+                                        [ icon ]
+
+                                alignTd =
+                                    td [ Attr.style "text-align" "center" ]
+                                        [ div [ Attr.class "align-group" ]
+                                            [ alignBtn AlignLeft "l" "Left" alignLeftIcon
+                                            , alignBtn AlignCenter "c" "Center" alignCenterIcon
+                                            , alignBtn AlignRight "r" "Right" alignRightIcon
+                                            ]
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
+
+                            else
+                                [ alignTd ]
+                        )
+                        colRange
+                    ++ [ td [] [] ]
                 )
 
         hSepRow hIdx =
@@ -2394,7 +2481,7 @@ viewTableEditor model =
           else
             text ""
         , table [ Attr.class "editor-table" ]
-            [ thead [] [ alignmentRow ]
+            [ thead [] [ headerAlignmentRow, bodyAlignmentRow ]
             , tbody [] bodyRows
             ]
         , div [ Attr.class "button-row" ]
@@ -2429,7 +2516,7 @@ viewMarkdownOutput model =
             SeqSet.member MarkdownSection model.collapsedSections
 
         markdown =
-            generateMarkdown model.outputFormat model.rows model.cols model.cells model.alignments
+            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments
     in
     div [ Attr.class "output-section" ]
         (div
@@ -2508,7 +2595,11 @@ viewRenderedTable model =
         cellAttrs r c =
             let
                 align =
-                    getAlignment c model.alignments
+                    if r == 0 then
+                        getHeaderAlignment c model.headerAlignments
+
+                    else
+                        getBodyAlignment c model.bodyAlignments
 
                 top =
                     getEffectiveHStyle r c model.cellHorizontalStyles model.horizontalLineStyles
@@ -2619,7 +2710,7 @@ viewHtmlTableOutput model =
             SeqSet.member HtmlSection model.collapsedSections
 
         htmlTable =
-            generateHtmlTable model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
+            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
     in
     div [ Attr.class "output-section" ]
         (div
@@ -2670,7 +2761,7 @@ viewBoxDrawingOutput model =
             SeqSet.member BoxDrawingSection model.collapsedSections
 
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.alignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
+            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
     in
     div [ Attr.class "output-section" ]
         (div
