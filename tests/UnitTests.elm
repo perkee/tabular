@@ -1,8 +1,8 @@
 module UnitTests exposing (..)
 
-import Dict
 import Expect
 import Frontend exposing (..)
+import Index exposing (..)
 import Test exposing (..)
 import Types exposing (..)
 
@@ -21,14 +21,14 @@ parseImportDataTests =
                         parseImportData "a,b,c\n1,2,3"
                 in
                 Expect.all
-                    [ \r -> Expect.equal 2 r.rows
-                    , \r -> Expect.equal 3 r.cols
-                    , \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r.cells)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 0, 1 ) r.cells)
-                    , \r -> Expect.equal (Just "c") (Dict.get ( 0, 2 ) r.cells)
-                    , \r -> Expect.equal (Just "1") (Dict.get ( 1, 0 ) r.cells)
-                    , \r -> Expect.equal (Just "2") (Dict.get ( 1, 1 ) r.cells)
-                    , \r -> Expect.equal (Just "3") (Dict.get ( 1, 2 ) r.cells)
+                    [ \r -> Expect.equal (count 2) r.rows
+                    , \r -> Expect.equal (count 3) r.cols
+                    , \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r.cells)
+                    , \r -> Expect.equal (Just "b") (get2 (index 0) (index 1) r.cells)
+                    , \r -> Expect.equal (Just "c") (get2 (index 0) (index 2) r.cells)
+                    , \r -> Expect.equal (Just "1") (get2 (index 1) (index 0) r.cells)
+                    , \r -> Expect.equal (Just "2") (get2 (index 1) (index 1) r.cells)
+                    , \r -> Expect.equal (Just "3") (get2 (index 1) (index 2) r.cells)
                     ]
                     result
         , test "TSV input parses correctly" <|
@@ -38,12 +38,12 @@ parseImportDataTests =
                         parseImportData "x\ty\n1\t2"
                 in
                 Expect.all
-                    [ \r -> Expect.equal 2 r.rows
-                    , \r -> Expect.equal 2 r.cols
-                    , \r -> Expect.equal (Just "x") (Dict.get ( 0, 0 ) r.cells)
-                    , \r -> Expect.equal (Just "y") (Dict.get ( 0, 1 ) r.cells)
-                    , \r -> Expect.equal (Just "1") (Dict.get ( 1, 0 ) r.cells)
-                    , \r -> Expect.equal (Just "2") (Dict.get ( 1, 1 ) r.cells)
+                    [ \r -> Expect.equal (count 2) r.rows
+                    , \r -> Expect.equal (count 2) r.cols
+                    , \r -> Expect.equal (Just "x") (get2 (index 0) (index 0) r.cells)
+                    , \r -> Expect.equal (Just "y") (get2 (index 0) (index 1) r.cells)
+                    , \r -> Expect.equal (Just "1") (get2 (index 1) (index 0) r.cells)
+                    , \r -> Expect.equal (Just "2") (get2 (index 1) (index 1) r.cells)
                     ]
                     result
         , test "empty input returns 0 rows and 0 cols" <|
@@ -53,8 +53,8 @@ parseImportDataTests =
                         parseImportData ""
                 in
                 Expect.all
-                    [ \r -> Expect.equal 0 r.rows
-                    , \r -> Expect.equal 0 r.cols
+                    [ \r -> Expect.equal (count 0) r.rows
+                    , \r -> Expect.equal (count 0) r.cols
                     ]
                     result
         , test "whitespace-only input returns 0 rows and 0 cols" <|
@@ -64,8 +64,8 @@ parseImportDataTests =
                         parseImportData "   \n  "
                 in
                 Expect.all
-                    [ \r -> Expect.equal 0 r.rows
-                    , \r -> Expect.equal 0 r.cols
+                    [ \r -> Expect.equal (count 0) r.rows
+                    , \r -> Expect.equal (count 0) r.cols
                     ]
                     result
         , test "single cell" <|
@@ -75,9 +75,9 @@ parseImportDataTests =
                         parseImportData "hello"
                 in
                 Expect.all
-                    [ \r -> Expect.equal 1 r.rows
-                    , \r -> Expect.equal 1 r.cols
-                    , \r -> Expect.equal (Just "hello") (Dict.get ( 0, 0 ) r.cells)
+                    [ \r -> Expect.equal (count 1) r.rows
+                    , \r -> Expect.equal (count 1) r.cols
+                    , \r -> Expect.equal (Just "hello") (get2 (index 0) (index 0) r.cells)
                     ]
                     result
         , test "ragged rows uses max column count" <|
@@ -87,9 +87,9 @@ parseImportDataTests =
                         parseImportData "a,b,c\n1,2"
                 in
                 Expect.all
-                    [ \r -> Expect.equal 2 r.rows
-                    , \r -> Expect.equal 3 r.cols
-                    , \r -> Expect.equal Nothing (Dict.get ( 1, 2 ) r.cells)
+                    [ \r -> Expect.equal (count 2) r.rows
+                    , \r -> Expect.equal (count 3) r.cols
+                    , \r -> Expect.equal Nothing (get2 (index 1) (index 2) r.cells)
                     ]
                     result
         , test "trims cell values" <|
@@ -99,10 +99,10 @@ parseImportDataTests =
                         parseImportData " a , b \n c , d "
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r.cells)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 0, 1 ) r.cells)
-                    , \r -> Expect.equal (Just "c") (Dict.get ( 1, 0 ) r.cells)
-                    , \r -> Expect.equal (Just "d") (Dict.get ( 1, 1 ) r.cells)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r.cells)
+                    , \r -> Expect.equal (Just "b") (get2 (index 0) (index 1) r.cells)
+                    , \r -> Expect.equal (Just "c") (get2 (index 1) (index 0) r.cells)
+                    , \r -> Expect.equal (Just "d") (get2 (index 1) (index 1) r.cells)
                     ]
                     result
         ]
@@ -119,133 +119,133 @@ generateMarkdownTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H1" )
-                            , ( ( 0, 1 ), "H2" )
-                            , ( ( 1, 0 ), "a" )
-                            , ( ( 1, 1 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "H1" )
+                            , ( index 0, index 1, "H2" )
+                            , ( index 1, index 0, "a" )
+                            , ( index 1, index 1, "b" )
                             ]
 
                     result =
-                        generateMarkdown Expanded 2 2 cells Dict.empty Dict.empty
+                        generateMarkdown Expanded (count 2) (count 2) cells empty empty
                 in
                 Expect.equal "| H1  | H2  |\n| --- | --- |\n| a   | b   |" result
         , test "compact format produces minimal separators for left alignment" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H1" )
-                            , ( ( 0, 1 ), "H2" )
-                            , ( ( 1, 0 ), "a" )
-                            , ( ( 1, 1 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "H1" )
+                            , ( index 0, index 1, "H2" )
+                            , ( index 1, index 0, "a" )
+                            , ( index 1, index 1, "b" )
                             ]
 
                     result =
-                        generateMarkdown Compact 2 2 cells Dict.empty Dict.empty
+                        generateMarkdown Compact (count 2) (count 2) cells empty empty
                 in
                 Expect.equal "| H1 | H2 |\n| --- | --- |\n| a | b |" result
         , test "compact format with center alignment produces :-:" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "x" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "x" )
                             ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignCenter ) ]
+                        Index.fromList [ ( index 0, AlignCenter ) ]
 
                     result =
-                        generateMarkdown Compact 2 1 cells Dict.empty bodyAlignments
+                        generateMarkdown Compact (count 2) (count 1) cells empty bodyAlignments
                 in
                 Expect.equal "| H |\n| :-: |\n| x |" result
         , test "compact format with right alignment produces --:" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "x" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "x" )
                             ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignRight ) ]
+                        Index.fromList [ ( index 0, AlignRight ) ]
 
                     result =
-                        generateMarkdown Compact 2 1 cells Dict.empty bodyAlignments
+                        generateMarkdown Compact (count 2) (count 1) cells empty bodyAlignments
                 in
                 Expect.equal "| H |\n| --: |\n| x |" result
         , test "expanded format with center alignment" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "Head" )
-                            , ( ( 1, 0 ), "data" )
+                        fromList2
+                            [ ( index 0, index 0, "Head" )
+                            , ( index 1, index 0, "data" )
                             ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignCenter ) ]
+                        Index.fromList [ ( index 0, AlignCenter ) ]
 
                     result =
-                        generateMarkdown Expanded 2 1 cells Dict.empty bodyAlignments
+                        generateMarkdown Expanded (count 2) (count 1) cells empty bodyAlignments
                 in
                 Expect.equal "| Head |\n| :--: |\n| data |" result
         , test "expanded format with right alignment" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "Head" )
-                            , ( ( 1, 0 ), "data" )
+                        fromList2
+                            [ ( index 0, index 0, "Head" )
+                            , ( index 1, index 0, "data" )
                             ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignRight ) ]
+                        Index.fromList [ ( index 0, AlignRight ) ]
 
                     result =
-                        generateMarkdown Expanded 2 1 cells Dict.empty bodyAlignments
+                        generateMarkdown Expanded (count 2) (count 1) cells empty bodyAlignments
                 in
                 Expect.equal "| Head |\n| ---: |\n| data |" result
         , test "pipe characters in cells are escaped" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "a|b" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "a|b" )
                             ]
 
                     result =
-                        generateMarkdown Compact 2 1 cells Dict.empty Dict.empty
+                        generateMarkdown Compact (count 2) (count 1) cells empty empty
                 in
                 Expect.equal True
                     (String.contains "a\\|b" result)
         , test "empty table (0 rows) returns empty string" <|
             \_ ->
-                Expect.equal "" (generateMarkdown Expanded 0 2 Dict.empty Dict.empty Dict.empty)
+                Expect.equal "" (generateMarkdown Expanded (count 0) (count 2) empty2 empty empty)
         , test "empty table (0 cols) returns empty string" <|
             \_ ->
-                Expect.equal "" (generateMarkdown Expanded 2 0 Dict.empty Dict.empty Dict.empty)
+                Expect.equal "" (generateMarkdown Expanded (count 2) (count 0) empty2 empty empty)
         , test "separator uses body alignment, header row uses header alignment" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "Head" )
-                            , ( ( 1, 0 ), "data" )
+                        fromList2
+                            [ ( index 0, index 0, "Head" )
+                            , ( index 1, index 0, "data" )
                             ]
 
                     headerAlignments =
-                        Dict.fromList [ ( 0, AlignCenter ) ]
+                        Index.fromList [ ( index 0, AlignCenter ) ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignRight ) ]
+                        Index.fromList [ ( index 0, AlignRight ) ]
 
                     result =
-                        generateMarkdown Expanded 2 1 cells headerAlignments bodyAlignments
+                        generateMarkdown Expanded (count 2) (count 1) cells headerAlignments bodyAlignments
                 in
                 -- Header row padded center, separator right-aligned, body row padded right
                 Expect.equal "| Head |\n| ---: |\n| data |" result
@@ -253,10 +253,10 @@ generateMarkdownTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList [ ( ( 0, 0 ), "H1" ), ( ( 0, 1 ), "H2" ) ]
+                        fromList2 [ ( index 0, index 0, "H1" ), ( index 0, index 1, "H2" ) ]
 
                     result =
-                        generateMarkdown Expanded 1 2 cells Dict.empty Dict.empty
+                        generateMarkdown Expanded (count 1) (count 2) cells empty empty
                 in
                 Expect.equal "| H1  | H2  |\n| --- | --- |" result
         ]
@@ -273,41 +273,41 @@ generateBoxDrawingTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList [ ( ( 0, 0 ), "A" ) ]
+                        fromList2 [ ( index 0, index 0, "A" ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateBoxDrawing (count 1) (count 1) cells empty empty empty empty empty2 empty2
                 in
                 Expect.equal "┌───┐\n│ A │\n└───┘" result
         , test "basic 2x2 table with Thin borders" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "A" )
-                            , ( ( 0, 1 ), "B" )
-                            , ( ( 1, 0 ), "C" )
-                            , ( ( 1, 1 ), "D" )
+                        fromList2
+                            [ ( index 0, index 0, "A" )
+                            , ( index 0, index 1, "B" )
+                            , ( index 1, index 0, "C" )
+                            , ( index 1, index 1, "D" )
                             ]
 
                     result =
-                        generateBoxDrawing 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateBoxDrawing (count 2) (count 2) cells empty empty empty empty empty2 empty2
                 in
                 Expect.equal "┌───┬───┐\n│ A │ B │\n├───┼───┤\n│ C │ D │\n└───┴───┘" result
         , test "empty table returns empty string" <|
             \_ ->
-                Expect.equal "" (generateBoxDrawing 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty)
+                Expect.equal "" (generateBoxDrawing (count 0) (count 1) empty2 empty empty empty empty empty2 empty2)
         , test "alignment affects cell padding" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList [ ( ( 0, 0 ), "AB" ) ]
+                        fromList2 [ ( index 0, index 0, "AB" ) ]
 
                     alignRight =
-                        Dict.fromList [ ( 0, AlignRight ) ]
+                        Index.fromList [ ( index 0, AlignRight ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells alignRight alignRight Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateBoxDrawing (count 1) (count 1) cells alignRight alignRight empty empty empty2 empty2
                 in
                 -- Right aligned: "AB" should be right-padded
                 Expect.equal True
@@ -316,16 +316,16 @@ generateBoxDrawingTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList [ ( ( 0, 0 ), "X" ) ]
+                        fromList2 [ ( index 0, index 0, "X" ) ]
 
                     hStyles =
-                        Dict.fromList [ ( 0, Double ), ( 1, Double ) ]
+                        Index.fromList [ ( index 0, Double ), ( index 1, Double ) ]
 
                     vStyles =
-                        Dict.fromList [ ( 0, Double ), ( 1, Double ) ]
+                        Index.fromList [ ( index 0, Double ), ( index 1, Double ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty
+                        generateBoxDrawing (count 1) (count 1) cells empty empty hStyles vStyles empty2 empty2
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "═" r)
@@ -337,16 +337,16 @@ generateBoxDrawingTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList [ ( ( 0, 0 ), "X" ) ]
+                        fromList2 [ ( index 0, index 0, "X" ) ]
 
                     hStyles =
-                        Dict.fromList [ ( 0, Thick ), ( 1, Thick ) ]
+                        Index.fromList [ ( index 0, Thick ), ( index 1, Thick ) ]
 
                     vStyles =
-                        Dict.fromList [ ( 0, Thick ), ( 1, Thick ) ]
+                        Index.fromList [ ( index 0, Thick ), ( index 1, Thick ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty
+                        generateBoxDrawing (count 1) (count 1) cells empty empty hStyles vStyles empty2 empty2
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "━" r)
@@ -367,13 +367,13 @@ generateHtmlTableTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H1" )
-                            , ( ( 1, 0 ), "D1" )
+                        fromList2
+                            [ ( index 0, index 0, "H1" )
+                            , ( index 1, index 0, "D1" )
                             ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable (count 2) (count 1) cells empty empty empty empty empty2 empty2
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.startsWith "<table>" r)
@@ -388,13 +388,13 @@ generateHtmlTableTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "<b>bold&\"test\"</b>" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "<b>bold&\"test\"</b>" )
                             ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable (count 2) (count 1) cells empty empty empty empty empty2 empty2
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "&lt;b&gt;" r)
@@ -406,16 +406,16 @@ generateHtmlTableTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "D" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "D" )
                             ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignCenter ) ]
+                        Index.fromList [ ( index 0, AlignCenter ) ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty bodyAlignments Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable (count 2) (count 1) cells empty bodyAlignments empty empty empty2 empty2
                 in
                 Expect.equal True
                     (String.contains "text-align: center" result)
@@ -423,16 +423,16 @@ generateHtmlTableTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "D" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "D" )
                             ]
 
                     hStyles =
-                        Dict.fromList [ ( 0, Thick ) ]
+                        Index.fromList [ ( index 0, Thick ) ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty Dict.empty hStyles Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable (count 2) (count 1) cells empty empty hStyles empty empty2 empty2
                 in
                 Expect.equal True
                     (String.contains "border-top: 3px solid" result)
@@ -440,10 +440,10 @@ generateHtmlTableTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList [ ( ( 0, 0 ), "H" ) ]
+                        fromList2 [ ( index 0, index 0, "H" ) ]
 
                     result =
-                        generateHtmlTable 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable (count 1) (count 1) cells empty empty empty empty empty2 empty2
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "<thead>" r)
@@ -452,21 +452,21 @@ generateHtmlTableTests =
                     result
         , test "empty table returns empty string" <|
             \_ ->
-                Expect.equal "" (generateHtmlTable 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty)
+                Expect.equal "" (generateHtmlTable (count 0) (count 1) empty2 empty empty empty empty empty2 empty2)
         , test "right alignment in HTML" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "H" )
-                            , ( ( 1, 0 ), "D" )
+                        fromList2
+                            [ ( index 0, index 0, "H" )
+                            , ( index 1, index 0, "D" )
                             ]
 
                     bodyAlignments =
-                        Dict.fromList [ ( 0, AlignRight ) ]
+                        Index.fromList [ ( index 0, AlignRight ) ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty bodyAlignments Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable (count 2) (count 1) cells empty bodyAlignments empty empty empty2 empty2
                 in
                 Expect.equal True
                     (String.contains "text-align: right" result)
@@ -484,54 +484,54 @@ removeRowTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 1, 0 ), "b" )
-                            , ( ( 2, 0 ), "c" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 1, index 0, "b" )
+                            , ( index 2, index 0, "c" )
                             ]
 
                     result =
-                        removeRow 1 cells
+                        removeRow (index 1) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just "c") (Dict.get ( 1, 0 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 2, 0 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just "c") (get2 (index 1) (index 0) r)
+                    , \r -> Expect.equal Nothing (get2 (index 2) (index 0) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         , test "removes first row" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 1, 0 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 1, index 0, "b" )
                             ]
 
                     result =
-                        removeRow 0 cells
+                        removeRow (index 0) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "b") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal 1 (Dict.size r)
+                    [ \r -> Expect.equal (Just "b") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal 1 (size2 r)
                     ]
                     result
         , test "removes last row" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 1, 0 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 1, index 0, "b" )
                             ]
 
                     result =
-                        removeRow 1 cells
+                        removeRow (index 1) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal 1 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal 1 (size2 r)
                     ]
                     result
         ]
@@ -544,37 +544,37 @@ removeColumnTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 0, 1 ), "b" )
-                            , ( ( 0, 2 ), "c" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 0, index 1, "b" )
+                            , ( index 0, index 2, "c" )
                             ]
 
                     result =
-                        removeColumn 1 cells
+                        removeColumn (index 1) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just "c") (Dict.get ( 0, 1 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 0, 2 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just "c") (get2 (index 0) (index 1) r)
+                    , \r -> Expect.equal Nothing (get2 (index 0) (index 2) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         , test "removes first column" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 0, 1 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 0, index 1, "b" )
                             ]
 
                     result =
-                        removeColumn 0 cells
+                        removeColumn (index 0) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "b") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal 1 (Dict.size r)
+                    [ \r -> Expect.equal (Just "b") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal 1 (size2 r)
                     ]
                     result
         ]
@@ -587,20 +587,20 @@ removeColumnAlignmentsTests =
             \_ ->
                 let
                     alignments =
-                        Dict.fromList
-                            [ ( 0, AlignLeft )
-                            , ( 1, AlignCenter )
-                            , ( 2, AlignRight )
+                        Index.fromList
+                            [ ( index 0, AlignLeft )
+                            , ( index 1, AlignCenter )
+                            , ( index 2, AlignRight )
                             ]
 
                     result =
-                        removeColumnAlignments 1 alignments
+                        removeColumnAlignments (index 1) alignments
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just AlignLeft) (Dict.get 0 r)
-                    , \r -> Expect.equal (Just AlignRight) (Dict.get 1 r)
-                    , \r -> Expect.equal Nothing (Dict.get 2 r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just AlignLeft) (Index.get (index 0) r)
+                    , \r -> Expect.equal (Just AlignRight) (Index.get (index 1) r)
+                    , \r -> Expect.equal Nothing (Index.get (index 2) r)
+                    , \r -> Expect.equal 2 (Index.size r)
                     ]
                     result
         ]
@@ -614,21 +614,21 @@ removeCellStyleRowTests =
                 let
                     -- Row 1 removal affects hIdx 1 and hIdx 2 (the lines above and below row 1)
                     styles =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), Thin )
-                            , ( ( 1, 0 ), Thick )
-                            , ( ( 2, 0 ), Double )
-                            , ( ( 3, 0 ), Thin )
+                        fromList2
+                            [ ( index 0, index 0, Thin )
+                            , ( index 1, index 0, Thick )
+                            , ( index 2, index 0, Double )
+                            , ( index 3, index 0, Thin )
                             ]
 
                     result =
-                        removeCellStyleRow 1 styles
+                        removeCellStyleRow (index 1) styles
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just Thin) (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 1, 0 ) r)
-                    , \r -> Expect.equal (Just Thin) (Dict.get ( 2, 0 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just Thin) (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal Nothing (get2 (index 1) (index 0) r)
+                    , \r -> Expect.equal (Just Thin) (get2 (index 2) (index 0) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         ]
@@ -641,19 +641,19 @@ removeCellStyleColTests =
             \_ ->
                 let
                     styles =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), Thin )
-                            , ( ( 0, 1 ), Thick )
-                            , ( ( 0, 2 ), Double )
+                        fromList2
+                            [ ( index 0, index 0, Thin )
+                            , ( index 0, index 1, Thick )
+                            , ( index 0, index 2, Double )
                             ]
 
                     result =
-                        removeCellStyleCol 1 styles
+                        removeCellStyleCol (index 1) styles
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just Thin) (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just Double) (Dict.get ( 0, 1 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just Thin) (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just Double) (get2 (index 0) (index 1) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         ]
@@ -666,58 +666,58 @@ insertRowTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 1, 0 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 1, index 0, "b" )
                             ]
 
                     result =
-                        insertRow 0 cells
+                        insertRowCells (index 0) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 1, 0 ) r)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 2, 0 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 1) (index 0) r)
+                    , \r -> Expect.equal (Just "b") (get2 (index 2) (index 0) r)
+                    , \r -> Expect.equal Nothing (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         , test "inserts in the middle" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 1, 0 ), "b" )
-                            , ( ( 2, 0 ), "c" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 1, index 0, "b" )
+                            , ( index 2, index 0, "c" )
                             ]
 
                     result =
-                        insertRow 1 cells
+                        insertRowCells (index 1) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 2, 0 ) r)
-                    , \r -> Expect.equal (Just "c") (Dict.get ( 3, 0 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 1, 0 ) r)
-                    , \r -> Expect.equal 3 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just "b") (get2 (index 2) (index 0) r)
+                    , \r -> Expect.equal (Just "c") (get2 (index 3) (index 0) r)
+                    , \r -> Expect.equal Nothing (get2 (index 1) (index 0) r)
+                    , \r -> Expect.equal 3 (size2 r)
                     ]
                     result
         , test "inserts at the end" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 1, 0 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 1, index 0, "b" )
                             ]
 
                     result =
-                        insertRow 2 cells
+                        insertRowCells (index 2) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 1, 0 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just "b") (get2 (index 1) (index 0) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         ]
@@ -730,40 +730,40 @@ insertColumnTests =
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 0, 1 ), "b" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 0, index 1, "b" )
                             ]
 
                     result =
-                        insertColumn 0 cells
+                        insertColumnCells (index 0) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 1 ) r)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 0, 2 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal 2 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 1) r)
+                    , \r -> Expect.equal (Just "b") (get2 (index 0) (index 2) r)
+                    , \r -> Expect.equal Nothing (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal 2 (size2 r)
                     ]
                     result
         , test "inserts in the middle" <|
             \_ ->
                 let
                     cells =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), "a" )
-                            , ( ( 0, 1 ), "b" )
-                            , ( ( 0, 2 ), "c" )
+                        fromList2
+                            [ ( index 0, index 0, "a" )
+                            , ( index 0, index 1, "b" )
+                            , ( index 0, index 2, "c" )
                             ]
 
                     result =
-                        insertColumn 1 cells
+                        insertColumnCells (index 1) cells
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just "a") (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just "b") (Dict.get ( 0, 2 ) r)
-                    , \r -> Expect.equal (Just "c") (Dict.get ( 0, 3 ) r)
-                    , \r -> Expect.equal Nothing (Dict.get ( 0, 1 ) r)
-                    , \r -> Expect.equal 3 (Dict.size r)
+                    [ \r -> Expect.equal (Just "a") (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just "b") (get2 (index 0) (index 2) r)
+                    , \r -> Expect.equal (Just "c") (get2 (index 0) (index 3) r)
+                    , \r -> Expect.equal Nothing (get2 (index 0) (index 1) r)
+                    , \r -> Expect.equal 3 (size2 r)
                     ]
                     result
         ]
@@ -776,21 +776,21 @@ insertColumnAlignmentsTests =
             \_ ->
                 let
                     alignments =
-                        Dict.fromList
-                            [ ( 0, AlignLeft )
-                            , ( 1, AlignCenter )
-                            , ( 2, AlignRight )
+                        Index.fromList
+                            [ ( index 0, AlignLeft )
+                            , ( index 1, AlignCenter )
+                            , ( index 2, AlignRight )
                             ]
 
                     result =
-                        insertColumnAlignments 1 alignments
+                        insertColumnAlignments (index 1) alignments
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just AlignLeft) (Dict.get 0 r)
-                    , \r -> Expect.equal Nothing (Dict.get 1 r)
-                    , \r -> Expect.equal (Just AlignCenter) (Dict.get 2 r)
-                    , \r -> Expect.equal (Just AlignRight) (Dict.get 3 r)
-                    , \r -> Expect.equal 3 (Dict.size r)
+                    [ \r -> Expect.equal (Just AlignLeft) (Index.get (index 0) r)
+                    , \r -> Expect.equal Nothing (Index.get (index 1) r)
+                    , \r -> Expect.equal (Just AlignCenter) (Index.get (index 2) r)
+                    , \r -> Expect.equal (Just AlignRight) (Index.get (index 3) r)
+                    , \r -> Expect.equal 3 (Index.size r)
                     ]
                     result
         ]
@@ -803,21 +803,21 @@ insertIndexIntoDictTests =
             \_ ->
                 let
                     dict =
-                        Dict.fromList
-                            [ ( 0, Thin )
-                            , ( 1, Thick )
-                            , ( 2, Double )
+                        Index.fromList
+                            [ ( index 0, Thin )
+                            , ( index 1, Thick )
+                            , ( index 2, Double )
                             ]
 
                     result =
-                        insertIndexIntoDict 1 dict
+                        insertIndexIntoDict (index 1) dict
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just Thin) (Dict.get 0 r)
-                    , \r -> Expect.equal Nothing (Dict.get 1 r)
-                    , \r -> Expect.equal (Just Thick) (Dict.get 2 r)
-                    , \r -> Expect.equal (Just Double) (Dict.get 3 r)
-                    , \r -> Expect.equal 3 (Dict.size r)
+                    [ \r -> Expect.equal (Just Thin) (Index.get (index 0) r)
+                    , \r -> Expect.equal Nothing (Index.get (index 1) r)
+                    , \r -> Expect.equal (Just Thick) (Index.get (index 2) r)
+                    , \r -> Expect.equal (Just Double) (Index.get (index 3) r)
+                    , \r -> Expect.equal 3 (Index.size r)
                     ]
                     result
         ]
@@ -830,20 +830,20 @@ insertCellStyleRowTests =
             \_ ->
                 let
                     styles =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), Thin )
-                            , ( ( 1, 0 ), Thick )
-                            , ( ( 2, 0 ), Double )
+                        fromList2
+                            [ ( index 0, index 0, Thin )
+                            , ( index 1, index 0, Thick )
+                            , ( index 2, index 0, Double )
                             ]
 
                     result =
-                        insertCellStyleRow 1 styles
+                        insertCellStyleRow (index 1) styles
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just Thin) (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just Thick) (Dict.get ( 1, 0 ) r)
-                    , \r -> Expect.equal (Just Double) (Dict.get ( 3, 0 ) r)
-                    , \r -> Expect.equal 3 (Dict.size r)
+                    [ \r -> Expect.equal (Just Thin) (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just Thick) (get2 (index 1) (index 0) r)
+                    , \r -> Expect.equal (Just Double) (get2 (index 3) (index 0) r)
+                    , \r -> Expect.equal 3 (size2 r)
                     ]
                     result
         ]
@@ -856,20 +856,20 @@ insertCellStyleColTests =
             \_ ->
                 let
                     styles =
-                        Dict.fromList
-                            [ ( ( 0, 0 ), Thin )
-                            , ( ( 0, 1 ), Thick )
-                            , ( ( 0, 2 ), Double )
+                        fromList2
+                            [ ( index 0, index 0, Thin )
+                            , ( index 0, index 1, Thick )
+                            , ( index 0, index 2, Double )
                             ]
 
                     result =
-                        insertCellStyleCol 1 styles
+                        insertCellStyleCol (index 1) styles
                 in
                 Expect.all
-                    [ \r -> Expect.equal (Just Thin) (Dict.get ( 0, 0 ) r)
-                    , \r -> Expect.equal (Just Thick) (Dict.get ( 0, 2 ) r)
-                    , \r -> Expect.equal (Just Double) (Dict.get ( 0, 3 ) r)
-                    , \r -> Expect.equal 3 (Dict.size r)
+                    [ \r -> Expect.equal (Just Thin) (get2 (index 0) (index 0) r)
+                    , \r -> Expect.equal (Just Thick) (get2 (index 0) (index 2) r)
+                    , \r -> Expect.equal (Just Double) (get2 (index 0) (index 3) r)
+                    , \r -> Expect.equal 3 (size2 r)
                     ]
                     result
         ]
@@ -1014,25 +1014,25 @@ tableSnapshotTests =
                 let
                     s : TableSnapshot
                     s =
-                        { rows = 2
-                        , cols = 3
-                        , cells = Dict.fromList [ ( ( 0, 0 ), "A" ) ]
-                        , headerAlignments = Dict.fromList [ ( 0, AlignCenter ) ]
-                        , bodyAlignments = Dict.fromList [ ( 0, AlignRight ) ]
-                        , horizontalLineStyles = Dict.fromList [ ( 0, Thick ) ]
-                        , verticalLineStyles = Dict.fromList [ ( 1, Double ) ]
-                        , cellHorizontalStyles = Dict.empty
-                        , cellVerticalStyles = Dict.empty
+                        { rows = count 2
+                        , cols = count 3
+                        , cells = fromList2 [ ( index 0, index 0, "A" ) ]
+                        , headerAlignments = Index.fromList [ ( index 0, AlignCenter ) ]
+                        , bodyAlignments = Index.fromList [ ( index 0, AlignRight ) ]
+                        , horizontalLineStyles = Index.fromList [ ( index 0, Thick ) ]
+                        , verticalLineStyles = Index.fromList [ ( index 1, Double ) ]
+                        , cellHorizontalStyles = empty2
+                        , cellVerticalStyles = empty2
                         }
                 in
                 Expect.all
-                    [ \snap -> Expect.equal 2 snap.rows
-                    , \snap -> Expect.equal 3 snap.cols
-                    , \snap -> Expect.equal (Just "A") (Dict.get ( 0, 0 ) snap.cells)
-                    , \snap -> Expect.equal (Just AlignCenter) (Dict.get 0 snap.headerAlignments)
-                    , \snap -> Expect.equal (Just AlignRight) (Dict.get 0 snap.bodyAlignments)
-                    , \snap -> Expect.equal (Just Thick) (Dict.get 0 snap.horizontalLineStyles)
-                    , \snap -> Expect.equal (Just Double) (Dict.get 1 snap.verticalLineStyles)
+                    [ \snap -> Expect.equal (count 2) snap.rows
+                    , \snap -> Expect.equal (count 3) snap.cols
+                    , \snap -> Expect.equal (Just "A") (get2 (index 0) (index 0) snap.cells)
+                    , \snap -> Expect.equal (Just AlignCenter) (Index.get (index 0) snap.headerAlignments)
+                    , \snap -> Expect.equal (Just AlignRight) (Index.get (index 0) snap.bodyAlignments)
+                    , \snap -> Expect.equal (Just Thick) (Index.get (index 0) snap.horizontalLineStyles)
+                    , \snap -> Expect.equal (Just Double) (Index.get (index 1) snap.verticalLineStyles)
                     ]
                     s
         ]
@@ -1045,39 +1045,39 @@ getEffectiveStyleTests =
             \_ ->
                 let
                     cellStyles =
-                        Dict.fromList [ ( ( 0, 0 ), Thick ) ]
+                        fromList2 [ ( index 0, index 0, Thick ) ]
 
                     rowStyles =
-                        Dict.fromList [ ( 0, Thin ) ]
+                        Index.fromList [ ( index 0, Thin ) ]
                 in
-                Expect.equal Thick (getEffectiveHStyle 0 0 cellStyles rowStyles)
+                Expect.equal Thick (getEffectiveHStyle (index 0) (index 0) cellStyles rowStyles)
         , test "falls back to row style when no cell override" <|
             \_ ->
                 let
                     rowStyles =
-                        Dict.fromList [ ( 0, Double ) ]
+                        Index.fromList [ ( index 0, Double ) ]
                 in
-                Expect.equal Double (getEffectiveHStyle 0 0 Dict.empty rowStyles)
+                Expect.equal Double (getEffectiveHStyle (index 0) (index 0) empty2 rowStyles)
         , test "defaults to Thin when no style set" <|
             \_ ->
-                Expect.equal Thin (getEffectiveHStyle 0 0 Dict.empty Dict.empty)
+                Expect.equal Thin (getEffectiveHStyle (index 0) (index 0) empty2 empty)
         , test "vertical: cell override takes precedence" <|
             \_ ->
                 let
                     cellStyles =
-                        Dict.fromList [ ( ( 0, 1 ), Double ) ]
+                        fromList2 [ ( index 0, index 1, Double ) ]
 
                     colStyles =
-                        Dict.fromList [ ( 1, Thick ) ]
+                        Index.fromList [ ( index 1, Thick ) ]
                 in
-                Expect.equal Double (getEffectiveVStyle 0 1 cellStyles colStyles)
+                Expect.equal Double (getEffectiveVStyle (index 0) (index 1) cellStyles colStyles)
         , test "vertical: falls back to column style" <|
             \_ ->
                 let
                     colStyles =
-                        Dict.fromList [ ( 1, Thick ) ]
+                        Index.fromList [ ( index 1, Thick ) ]
                 in
-                Expect.equal Thick (getEffectiveVStyle 0 1 Dict.empty colStyles)
+                Expect.equal Thick (getEffectiveVStyle (index 0) (index 1) empty2 colStyles)
         ]
 
 
@@ -1086,16 +1086,16 @@ hSepLabelTests =
     describe "hSepLabel"
         [ test "index 0 is Top border" <|
             \_ ->
-                Expect.equal "Top border" (hSepLabel 0 3)
+                Expect.equal "Top border" (hSepLabel (index 0) (count 3))
         , test "index == rows is Bottom border" <|
             \_ ->
-                Expect.equal "Bottom border" (hSepLabel 3 3)
+                Expect.equal "Bottom border" (hSepLabel (index 3) (count 3))
         , test "middle index shows row range" <|
             \_ ->
-                Expect.equal "Row 1-2" (hSepLabel 1 3)
+                Expect.equal "Row 1-2" (hSepLabel (index 1) (count 3))
         , test "another middle index" <|
             \_ ->
-                Expect.equal "Row 2-3" (hSepLabel 2 3)
+                Expect.equal "Row 2-3" (hSepLabel (index 2) (count 3))
         ]
 
 
@@ -1104,11 +1104,11 @@ vSepLabelTests =
     describe "vSepLabel"
         [ test "index 0 is Left border" <|
             \_ ->
-                Expect.equal "Left border" (vSepLabel 0 3)
+                Expect.equal "Left border" (vSepLabel (index 0) (count 3))
         , test "index == cols is Right border" <|
             \_ ->
-                Expect.equal "Right border" (vSepLabel 3 3)
+                Expect.equal "Right border" (vSepLabel (index 3) (count 3))
         , test "middle index shows column range" <|
             \_ ->
-                Expect.equal "Col 1-2" (vSepLabel 1 3)
+                Expect.equal "Col 1-2" (vSepLabel (index 1) (count 3))
         ]
