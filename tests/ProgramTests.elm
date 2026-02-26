@@ -181,9 +181,9 @@ tests =
             )
         ]
 
-    -- 8. Set alignment: click center button, verify it becomes active
+    -- 8. Set alignment: click body center button, verify it becomes active
     , Effect.Test.start
-        "Set center alignment activates the button"
+        "Set body center alignment activates the button"
         (Effect.Time.millisToPosix 0)
         config
         [ Effect.Test.connectFrontend
@@ -192,9 +192,9 @@ tests =
             "/"
             { width = 800, height = 600 }
             (\client ->
-                [ client.click 100 (Dom.id "align-0-c")
+                [ client.click 100 (Dom.id "balign-0-c")
                 , client.checkView 100
-                    (Test.Html.Query.find [ Test.Html.Selector.id "align-0-c" ]
+                    (Test.Html.Query.find [ Test.Html.Selector.id "balign-0-c" ]
                         >> Test.Html.Query.has [ Test.Html.Selector.class "active" ]
                     )
                 ]

@@ -11,7 +11,8 @@ type alias TableSnapshot =
     { rows : Int
     , cols : Int
     , cells : Dict ( Int, Int ) String
-    , alignments : Dict Int Alignment
+    , headerAlignments : Dict Int Alignment
+    , bodyAlignments : Dict Int Alignment
     , horizontalLineStyles : Dict Int LineStyle
     , verticalLineStyles : Dict Int LineStyle
     , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
@@ -24,7 +25,8 @@ type alias FrontendModel =
     , rows : Int
     , cols : Int
     , cells : Dict ( Int, Int ) String
-    , alignments : Dict Int Alignment
+    , headerAlignments : Dict Int Alignment
+    , bodyAlignments : Dict Int Alignment
     , horizontalLineStyles : Dict Int LineStyle
     , verticalLineStyles : Dict Int LineStyle
     , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
@@ -91,7 +93,8 @@ type FrontendMsg
     | InsertRow Int
     | InsertColumn Int
     | SetOutputFormat OutputFormat
-    | SetAlignment Int Alignment
+    | SetHeaderAlignment Int Alignment
+    | SetBodyAlignment Int Alignment
     | ToggleImport
     | ImportTextChanged String
     | ImportData

@@ -127,7 +127,7 @@ generateMarkdownTests =
                             ]
 
                     result =
-                        generateMarkdown Expanded 2 2 cells Dict.empty
+                        generateMarkdown Expanded 2 2 cells Dict.empty Dict.empty
                 in
                 Expect.equal "| H1  | H2  |\n| --- | --- |\n| a   | b   |" result
         , test "compact format produces minimal separators for left alignment" <|
@@ -142,7 +142,7 @@ generateMarkdownTests =
                             ]
 
                     result =
-                        generateMarkdown Compact 2 2 cells Dict.empty
+                        generateMarkdown Compact 2 2 cells Dict.empty Dict.empty
                 in
                 Expect.equal "| H1 | H2 |\n| --- | --- |\n| a | b |" result
         , test "compact format with center alignment produces :-:" <|
@@ -154,11 +154,11 @@ generateMarkdownTests =
                             , ( ( 1, 0 ), "x" )
                             ]
 
-                    alignments =
+                    bodyAlignments =
                         Dict.fromList [ ( 0, AlignCenter ) ]
 
                     result =
-                        generateMarkdown Compact 2 1 cells alignments
+                        generateMarkdown Compact 2 1 cells Dict.empty bodyAlignments
                 in
                 Expect.equal "| H |\n| :-: |\n| x |" result
         , test "compact format with right alignment produces --:" <|
@@ -170,11 +170,11 @@ generateMarkdownTests =
                             , ( ( 1, 0 ), "x" )
                             ]
 
-                    alignments =
+                    bodyAlignments =
                         Dict.fromList [ ( 0, AlignRight ) ]
 
                     result =
-                        generateMarkdown Compact 2 1 cells alignments
+                        generateMarkdown Compact 2 1 cells Dict.empty bodyAlignments
                 in
                 Expect.equal "| H |\n| --: |\n| x |" result
         , test "expanded format with center alignment" <|
@@ -186,11 +186,11 @@ generateMarkdownTests =
                             , ( ( 1, 0 ), "data" )
                             ]
 
-                    alignments =
+                    bodyAlignments =
                         Dict.fromList [ ( 0, AlignCenter ) ]
 
                     result =
-                        generateMarkdown Expanded 2 1 cells alignments
+                        generateMarkdown Expanded 2 1 cells Dict.empty bodyAlignments
                 in
                 Expect.equal "| Head |\n| :--: |\n| data |" result
         , test "expanded format with right alignment" <|
@@ -202,11 +202,11 @@ generateMarkdownTests =
                             , ( ( 1, 0 ), "data" )
                             ]
 
-                    alignments =
+                    bodyAlignments =
                         Dict.fromList [ ( 0, AlignRight ) ]
 
                     result =
-                        generateMarkdown Expanded 2 1 cells alignments
+                        generateMarkdown Expanded 2 1 cells Dict.empty bodyAlignments
                 in
                 Expect.equal "| Head |\n| ---: |\n| data |" result
         , test "pipe characters in cells are escaped" <|
@@ -219,16 +219,36 @@ generateMarkdownTests =
                             ]
 
                     result =
-                        generateMarkdown Compact 2 1 cells Dict.empty
+                        generateMarkdown Compact 2 1 cells Dict.empty Dict.empty
                 in
                 Expect.equal True
                     (String.contains "a\\|b" result)
         , test "empty table (0 rows) returns empty string" <|
             \_ ->
-                Expect.equal "" (generateMarkdown Expanded 0 2 Dict.empty Dict.empty)
+                Expect.equal "" (generateMarkdown Expanded 0 2 Dict.empty Dict.empty Dict.empty)
         , test "empty table (0 cols) returns empty string" <|
             \_ ->
-                Expect.equal "" (generateMarkdown Expanded 2 0 Dict.empty Dict.empty)
+                Expect.equal "" (generateMarkdown Expanded 2 0 Dict.empty Dict.empty Dict.empty)
+        , test "separator uses body alignment, header row uses header alignment" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Head" )
+                            , ( ( 1, 0 ), "data" )
+                            ]
+
+                    headerAlignments =
+                        Dict.fromList [ ( 0, AlignCenter ) ]
+
+                    bodyAlignments =
+                        Dict.fromList [ ( 0, AlignRight ) ]
+
+                    result =
+                        generateMarkdown Expanded 2 1 cells headerAlignments bodyAlignments
+                in
+                -- Header row padded center, separator right-aligned, body row padded right
+                Expect.equal "| Head |\n| ---: |\n| data |" result
         , test "single row table (header only)" <|
             \_ ->
                 let
@@ -236,7 +256,7 @@ generateMarkdownTests =
                         Dict.fromList [ ( ( 0, 0 ), "H1" ), ( ( 0, 1 ), "H2" ) ]
 
                     result =
-                        generateMarkdown Expanded 1 2 cells Dict.empty
+                        generateMarkdown Expanded 1 2 cells Dict.empty Dict.empty
                 in
                 Expect.equal "| H1  | H2  |\n| --- | --- |" result
         ]
@@ -256,7 +276,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( ( 0, 0 ), "A" ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.equal "┌───┐\n│ A │\n└───┘" result
         , test "basic 2x2 table with Thin borders" <|
@@ -271,12 +291,12 @@ generateBoxDrawingTests =
                             ]
 
                     result =
-                        generateBoxDrawing 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateBoxDrawing 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.equal "┌───┬───┐\n│ A │ B │\n├───┼───┤\n│ C │ D │\n└───┴───┘" result
         , test "empty table returns empty string" <|
             \_ ->
-                Expect.equal "" (generateBoxDrawing 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty)
+                Expect.equal "" (generateBoxDrawing 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty)
         , test "alignment affects cell padding" <|
             \_ ->
                 let
@@ -287,7 +307,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( 0, AlignRight ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells alignRight Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateBoxDrawing 1 1 cells alignRight alignRight Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 -- Right aligned: "AB" should be right-padded
                 Expect.equal True
@@ -305,7 +325,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( 0, Double ), ( 1, Double ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty hStyles vStyles Dict.empty Dict.empty
+                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "═" r)
@@ -326,7 +346,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( 0, Thick ), ( 1, Thick ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty hStyles vStyles Dict.empty Dict.empty
+                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "━" r)
@@ -353,14 +373,14 @@ generateHtmlTableTests =
                             ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable 2 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.startsWith "<table>" r)
                     , \r -> Expect.equal True (String.endsWith "</table>" r)
                     , \r -> Expect.equal True (String.contains "<thead>" r)
                     , \r -> Expect.equal True (String.contains "<tbody>" r)
-                    , \r -> Expect.equal True (String.contains "<th>" r)
+                    , \r -> Expect.equal True (String.contains "<th" r)
                     , \r -> Expect.equal True (String.contains "<td>" r)
                     ]
                     result
@@ -374,7 +394,7 @@ generateHtmlTableTests =
                             ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable 2 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "&lt;b&gt;" r)
@@ -391,11 +411,11 @@ generateHtmlTableTests =
                             , ( ( 1, 0 ), "D" )
                             ]
 
-                    alignments =
+                    bodyAlignments =
                         Dict.fromList [ ( 0, AlignCenter ) ]
 
                     result =
-                        generateHtmlTable 2 1 cells alignments Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable 2 1 cells Dict.empty bodyAlignments Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.equal True
                     (String.contains "text-align: center" result)
@@ -412,7 +432,7 @@ generateHtmlTableTests =
                         Dict.fromList [ ( 0, Thick ) ]
 
                     result =
-                        generateHtmlTable 2 1 cells Dict.empty hStyles Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable 2 1 cells Dict.empty Dict.empty hStyles Dict.empty Dict.empty Dict.empty
                 in
                 Expect.equal True
                     (String.contains "border-top: 3px solid" result)
@@ -423,7 +443,7 @@ generateHtmlTableTests =
                         Dict.fromList [ ( ( 0, 0 ), "H" ) ]
 
                     result =
-                        generateHtmlTable 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "<thead>" r)
@@ -432,7 +452,7 @@ generateHtmlTableTests =
                     result
         , test "empty table returns empty string" <|
             \_ ->
-                Expect.equal "" (generateHtmlTable 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty)
+                Expect.equal "" (generateHtmlTable 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty)
         , test "right alignment in HTML" <|
             \_ ->
                 let
@@ -442,11 +462,11 @@ generateHtmlTableTests =
                             , ( ( 1, 0 ), "D" )
                             ]
 
-                    alignments =
+                    bodyAlignments =
                         Dict.fromList [ ( 0, AlignRight ) ]
 
                     result =
-                        generateHtmlTable 2 1 cells alignments Dict.empty Dict.empty Dict.empty Dict.empty
+                        generateHtmlTable 2 1 cells Dict.empty bodyAlignments Dict.empty Dict.empty Dict.empty Dict.empty
                 in
                 Expect.equal True
                     (String.contains "text-align: right" result)
@@ -997,7 +1017,8 @@ tableSnapshotTests =
                         { rows = 2
                         , cols = 3
                         , cells = Dict.fromList [ ( ( 0, 0 ), "A" ) ]
-                        , alignments = Dict.fromList [ ( 0, AlignCenter ) ]
+                        , headerAlignments = Dict.fromList [ ( 0, AlignCenter ) ]
+                        , bodyAlignments = Dict.fromList [ ( 0, AlignRight ) ]
                         , horizontalLineStyles = Dict.fromList [ ( 0, Thick ) ]
                         , verticalLineStyles = Dict.fromList [ ( 1, Double ) ]
                         , cellHorizontalStyles = Dict.empty
@@ -1008,7 +1029,8 @@ tableSnapshotTests =
                     [ \snap -> Expect.equal 2 snap.rows
                     , \snap -> Expect.equal 3 snap.cols
                     , \snap -> Expect.equal (Just "A") (Dict.get ( 0, 0 ) snap.cells)
-                    , \snap -> Expect.equal (Just AlignCenter) (Dict.get 0 snap.alignments)
+                    , \snap -> Expect.equal (Just AlignCenter) (Dict.get 0 snap.headerAlignments)
+                    , \snap -> Expect.equal (Just AlignRight) (Dict.get 0 snap.bodyAlignments)
                     , \snap -> Expect.equal (Just Thick) (Dict.get 0 snap.horizontalLineStyles)
                     , \snap -> Expect.equal (Just Double) (Dict.get 1 snap.verticalLineStyles)
                     ]

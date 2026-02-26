@@ -121,11 +121,19 @@ test('switching to compact format changes markdown output', async ({ page }) => 
 
 // --- Alignment ---
 
-test('setting center alignment updates markdown separator', async ({ page }) => {
-  await page.locator('#align-0-c').click();
+test('setting body center alignment updates markdown separator', async ({ page }) => {
+  await page.locator('#balign-0-c').click();
 
-  // Expanded center alignment produces :-...-: pattern (auto-retries)
+  // Expanded center alignment produces :-...-: pattern in separator (auto-retries)
   await expect(page.locator('#md-output')).toHaveValue(/:-+:/);
+});
+
+test('header and body alignment are independent', async ({ page }) => {
+  // Set body to right for column 0 (header stays at default center)
+  await page.locator('#balign-0-r').click();
+
+  // Separator should use body alignment (right: ---...:)
+  await expect(page.locator('#md-output')).toHaveValue(/---+:/);
 });
 
 // --- Import ---
