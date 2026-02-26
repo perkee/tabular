@@ -4,6 +4,7 @@ import Dict
 import Evergreen.V3.Types
 import Evergreen.V4.Types
 import Lamdera.Migrations exposing (..)
+import SeqSet
 
 
 frontendModel : Evergreen.V3.Types.FrontendModel -> ModelMigration Evergreen.V4.Types.FrontendModel Evergreen.V4.Types.FrontendMsg
@@ -51,7 +52,7 @@ migrate_Types_FrontendModel old =
     , outputFormat = old.outputFormat |> migrate_Types_OutputFormat
     , showImport = old.showImport
     , importText = old.importText
-    , collapsedSections = old.collapsedSections
+    , collapsedSections = old.collapsedSections |> SeqSet.map migrate_Types_OutputSection
     , undoStack = []
     }
 
