@@ -156,10 +156,7 @@ test('import CSV populates the grid', async ({ page }) => {
 
 // --- Copy buttons ---
 
-const isRemote = !!process.env.BASE_URL;
-
 test('copy markdown button writes textarea value to clipboard', async ({ page, context }) => {
-  test.skip(isRemote, 'copy-button web component not available on preview deployments');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
   const copyBtn = page.locator('copy-button[target="md-output"] button');
@@ -171,7 +168,6 @@ test('copy markdown button writes textarea value to clipboard', async ({ page, c
 });
 
 test('copy box-drawing button writes textarea value to clipboard', async ({ page, context }) => {
-  test.skip(isRemote, 'copy-button web component not available on preview deployments');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
   const copyBtn = page.locator('copy-button[target="box-output"] button');
@@ -183,7 +179,6 @@ test('copy box-drawing button writes textarea value to clipboard', async ({ page
 });
 
 test('copy HTML button writes textarea value to clipboard', async ({ page, context }) => {
-  test.skip(isRemote, 'copy-button web component not available on preview deployments');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
   const copyBtn = page.locator('copy-button[target="html-output"] button');
@@ -195,7 +190,6 @@ test('copy HTML button writes textarea value to clipboard', async ({ page, conte
 });
 
 test('copy button shows "Copied!" feedback then resets', async ({ page, context }) => {
-  test.skip(isRemote, 'copy-button web component not available on preview deployments');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
   const copyBtn = page.locator('copy-button[target="md-output"] button');
