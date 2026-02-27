@@ -2603,7 +2603,6 @@ body {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    margin-top: 12px;
 }
 
 .sort-controls select {
@@ -2696,17 +2695,44 @@ body {
     display: block;
 }
 
+.editor-subsections {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.editor-subsection {
+    flex: 1;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #fafafa;
+}
+
+.subsection-header {
+    margin-bottom: 8px;
+}
+
+.subsection-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+
+button.subsection-title {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .summary-controls {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: 12px;
-}
-
-.sort-controls-label {
-    font-size: 13px;
-    color: #6b7280;
-    font-weight: 500;
 }
 
 .summary-row td,
@@ -3207,15 +3233,62 @@ viewTableEditor model =
 
     in
     div [ Attr.class "table-container" ]
-        [ if model.showImport then
-            div [ Attr.class "import-section" ]
+        [ table [ Attr.class "editor-table" ]
+            [ thead [] [ headerAlignmentRow, bodyAlignmentRow ]
+            , Html.Keyed.node "tbody" [] keyedBodyRows
+            ]
+        , div [ Attr.class "button-row" ]
+            [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
+                [ text "+ Row" ]
+            , button [ Attr.id "add-column", Attr.class "add-btn", onClick AddColumn ]
+                [ text "+ Column" ]
+            , button
+                [ Attr.id "undo-btn"
+                , Attr.class "add-btn"
+                , onClick Undo
+                , Attr.disabled (List.isEmpty model.undoStack)
+                ]
+                [ text "Undo" ]
+            ]
+        , div [ Attr.class "editor-subsections" ]
+            [ viewImportSubsection model
+            , viewSortSubsection model
+            , viewSummarySubsection model
+            ]
+        ]
+
+
+viewImportSubsection : Model -> Html FrontendMsg
+viewImportSubsection model =
+    div [ Attr.class "editor-subsection" ]
+        [ div [ Attr.class "subsection-header" ]
+            [ button
+                [ Attr.id "toggle-import"
+                , Attr.class "subsection-title"
+                , onClick ToggleImport
+                ]
+                [ span
+                    [ Attr.class
+                        (if model.showImport then
+                            "section-chevron"
+
+                         else
+                            "section-chevron collapsed"
+                        )
+                    ]
+                    [ text "▼" ]
+                , text "Import"
+                ]
+            ]
+        , if model.showImport then
+            div [ Attr.class "subsection-body" ]
                 [ textarea
                     [ Attr.id "import-textarea"
                     , Attr.class "import-textarea"
                     , Attr.placeholder "Paste from Excel, Google Sheets, or CSV..."
                     , Attr.value model.importText
                     , onInput ImportTextChanged
-                    , Attr.rows 6
+                    , Attr.rows 4
                     ]
                     []
                 , div [ Attr.class "import-actions" ]
@@ -3233,39 +3306,11 @@ viewTableEditor model =
 
           else
             text ""
-        , table [ Attr.class "editor-table" ]
-            [ thead [] [ headerAlignmentRow, bodyAlignmentRow ]
-            , Html.Keyed.node "tbody" [] keyedBodyRows
-            ]
-        , div [ Attr.class "button-row" ]
-            [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
-                [ text "+ Row" ]
-            , button [ Attr.id "add-column", Attr.class "add-btn", onClick AddColumn ]
-                [ text "+ Column" ]
-            , button [ Attr.id "toggle-import", Attr.class "add-btn", onClick ToggleImport ]
-                [ text
-                    (if model.showImport then
-                        "Hide Import"
-
-                     else
-                        "Import Data"
-                    )
-                ]
-            , button
-                [ Attr.id "undo-btn"
-                , Attr.class "add-btn"
-                , onClick Undo
-                , Attr.disabled (List.isEmpty model.undoStack)
-                ]
-                [ text "Undo" ]
-            ]
-        , viewSortControls model
-        , viewSummaryControls model
         ]
 
 
-viewSortControls : Model -> Html FrontendMsg
-viewSortControls model =
+viewSortSubsection : Model -> Html FrontendMsg
+viewSortSubsection model =
     let
         colRange =
             List.range 0 (model.cols - 1)
@@ -3394,39 +3439,50 @@ viewSortControls model =
                         ]
                     ]
     in
-    div [ Attr.class "sort-controls" ]
-        (select
-            [ Attr.id "sort-column"
-            , Attr.value selectedCol
-            , onInput SetSortColumn
+    div [ Attr.class "editor-subsection" ]
+        [ div [ Attr.class "subsection-header" ]
+            [ span [ Attr.class "subsection-title" ] [ text "Sort" ] ]
+        , div [ Attr.class "subsection-body" ]
+            [ div [ Attr.class "sort-controls" ]
+                (select
+                    [ Attr.id "sort-column"
+                    , Attr.value selectedCol
+                    , onInput SetSortColumn
+                    ]
+                    (option [ Attr.value "" ] [ text "Sort\u{2026}" ]
+                        :: List.map columnOption colRange
+                    )
+                    :: sortOptions
+                )
             ]
-            (option [ Attr.value "" ] [ text "Sort\u{2026}" ]
-                :: List.map columnOption colRange
-            )
-            :: sortOptions
-        )
+        ]
 
 
-viewSummaryControls : Model -> Html FrontendMsg
-viewSummaryControls model =
+viewSummarySubsection : Model -> Html FrontendMsg
+viewSummarySubsection model =
     let
         isActive fn =
             SeqSet.member fn model.summaryRows
     in
-    div [ Attr.class "summary-controls" ]
-        [ span [ Attr.class "sort-controls-label" ] [ text "Summary:" ]
-        , button
-            [ Attr.id "summary-max"
-            , Attr.class
-                (if isActive SummaryMax then
-                    "sort-pill active"
+    div [ Attr.class "editor-subsection" ]
+        [ div [ Attr.class "subsection-header" ]
+            [ span [ Attr.class "subsection-title" ] [ text "Summary" ] ]
+        , div [ Attr.class "subsection-body" ]
+            [ div [ Attr.class "summary-controls" ]
+                [ button
+                    [ Attr.id "summary-max"
+                    , Attr.class
+                        (if isActive SummaryMax then
+                            "sort-pill active"
 
-                 else
-                    "sort-pill"
-                )
-            , onClick (ToggleSummaryRow SummaryMax)
+                         else
+                            "sort-pill"
+                        )
+                    , onClick (ToggleSummaryRow SummaryMax)
+                    ]
+                    [ text "Max" ]
+                ]
             ]
-            [ text "Max" ]
         ]
 
 
