@@ -1,43 +1,10 @@
-module Types exposing (..)
+module Evergreen.V5.Types exposing (..)
 
 import Browser
-import Dict exposing (Dict)
+import Dict
 import Effect.Browser.Navigation
-import SeqSet exposing (SeqSet)
-import Url exposing (Url)
-
-
-type alias TableSnapshot =
-    { rows : Int
-    , cols : Int
-    , cells : Dict ( Int, Int ) String
-    , headerAlignments : Dict Int Alignment
-    , bodyAlignments : Dict Int Alignment
-    , horizontalLineStyles : Dict Int LineStyle
-    , verticalLineStyles : Dict Int LineStyle
-    , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
-    , cellVerticalStyles : Dict ( Int, Int ) LineStyle
-    }
-
-
-type alias FrontendModel =
-    { key : Effect.Browser.Navigation.Key
-    , rows : Int
-    , cols : Int
-    , cells : Dict ( Int, Int ) String
-    , headerAlignments : Dict Int Alignment
-    , bodyAlignments : Dict Int Alignment
-    , horizontalLineStyles : Dict Int LineStyle
-    , verticalLineStyles : Dict Int LineStyle
-    , cellHorizontalStyles : Dict ( Int, Int ) LineStyle
-    , cellVerticalStyles : Dict ( Int, Int ) LineStyle
-    , outputFormat : OutputFormat
-    , showImport : Bool
-    , importText : String
-    , collapsedSections : SeqSet OutputSection
-    , undoStack : List TableSnapshot
-    , sortState : SortState
-    }
+import SeqSet
+import Url
 
 
 type Alignment
@@ -57,13 +24,6 @@ type LineStyle
     | ThinDoubleDash
     | ThickDoubleDash
     | Double
-
-
-type LineWeight
-    = WNone
-    | WLight
-    | WHeavy
-    | WDouble
 
 
 type OutputFormat
@@ -93,6 +53,39 @@ type SortState
     | SortedBy Int SortDirection SortMethod
 
 
+type alias TableSnapshot =
+    { rows : Int
+    , cols : Int
+    , cells : Dict.Dict ( Int, Int ) String
+    , headerAlignments : Dict.Dict Int Alignment
+    , bodyAlignments : Dict.Dict Int Alignment
+    , horizontalLineStyles : Dict.Dict Int LineStyle
+    , verticalLineStyles : Dict.Dict Int LineStyle
+    , cellHorizontalStyles : Dict.Dict ( Int, Int ) LineStyle
+    , cellVerticalStyles : Dict.Dict ( Int, Int ) LineStyle
+    }
+
+
+type alias FrontendModel =
+    { key : Effect.Browser.Navigation.Key
+    , rows : Int
+    , cols : Int
+    , cells : Dict.Dict ( Int, Int ) String
+    , headerAlignments : Dict.Dict Int Alignment
+    , bodyAlignments : Dict.Dict Int Alignment
+    , horizontalLineStyles : Dict.Dict Int LineStyle
+    , verticalLineStyles : Dict.Dict Int LineStyle
+    , cellHorizontalStyles : Dict.Dict ( Int, Int ) LineStyle
+    , cellVerticalStyles : Dict.Dict ( Int, Int ) LineStyle
+    , outputFormat : OutputFormat
+    , showImport : Bool
+    , importText : String
+    , collapsedSections : SeqSet.SeqSet OutputSection
+    , undoStack : List TableSnapshot
+    , sortState : SortState
+    }
+
+
 type alias BackendModel =
     { message : String
     }
@@ -100,7 +93,7 @@ type alias BackendModel =
 
 type FrontendMsg
     = UrlClicked Browser.UrlRequest
-    | UrlChanged Url
+    | UrlChanged Url.Url
     | CellChanged Int Int String
     | AddRow
     | AddColumn

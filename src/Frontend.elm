@@ -9,6 +9,7 @@ import Effect.Subscription as Subscription
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
+import Html.Keyed
 import Svg
 import Svg.Attributes as SvgAttr
 import Lamdera
@@ -60,6 +61,7 @@ init _ key =
       , importText = ""
       , collapsedSections = SeqSet.empty
       , undoStack = []
+      , sortState = Unsorted
       }
     , Command.none
     )
@@ -82,6 +84,80 @@ snapshot model =
 pushUndo : Model -> List TableSnapshot
 pushUndo model =
     snapshot model :: model.undoStack |> List.take 50
+
+
+extractNumeric : String -> Maybe Float
+extractNumeric s =
+    let
+        filtered =
+            String.filter (\ch -> Char.isDigit ch || ch == '.') s
+    in
+    if String.isEmpty filtered then
+        Nothing
+
+    else
+        String.toFloat filtered
+
+
+sortedBodyRows : Model -> List Int
+sortedBodyRows model =
+    computeSortedBodyRows model.rows model.cells model.sortState
+
+
+computeSortedBodyRows : Int -> Dict ( Int, Int ) String -> SortState -> List Int
+computeSortedBodyRows rows cells sortState =
+    let
+        bodyRange =
+            List.range 1 (rows - 1)
+    in
+    case sortState of
+        Unsorted ->
+            bodyRange
+
+        SortedBy col dir method ->
+            let
+                getValue r =
+                    getCell r col cells
+
+                reverseOrder o =
+                    case o of
+                        LT ->
+                            GT
+
+                        EQ ->
+                            EQ
+
+                        GT ->
+                            LT
+
+                applyDir o =
+                    case dir of
+                        Ascending ->
+                            o
+
+                        Descending ->
+                            reverseOrder o
+
+                compareRows r1 r2 =
+                    case method of
+                        Lexicographic ->
+                            applyDir (compare (getValue r1) (getValue r2))
+
+                        Numeric ->
+                            case ( extractNumeric (getValue r1), extractNumeric (getValue r2) ) of
+                                ( Just a, Just b ) ->
+                                    applyDir (compare a b)
+
+                                ( Just _, Nothing ) ->
+                                    LT
+
+                                ( Nothing, Just _ ) ->
+                                    GT
+
+                                ( Nothing, Nothing ) ->
+                                    EQ
+            in
+            List.sortWith compareRows bodyRange
 
 
 update : FrontendMsg -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -127,6 +203,22 @@ update msg model =
 
         RemoveColumn colIndex ->
             if model.cols > 1 then
+                let
+                    newSortState =
+                        case model.sortState of
+                            SortedBy sortCol dir method ->
+                                if sortCol == colIndex then
+                                    Unsorted
+
+                                else if sortCol > colIndex then
+                                    SortedBy (sortCol - 1) dir method
+
+                                else
+                                    model.sortState
+
+                            Unsorted ->
+                                Unsorted
+                in
                 ( { model
                     | cols = model.cols - 1
                     , cells = removeColumn colIndex model.cells
@@ -136,6 +228,7 @@ update msg model =
                     , cellHorizontalStyles = removeCellStyleCol colIndex model.cellHorizontalStyles
                     , cellVerticalStyles = removeCellVStyleCol colIndex model.cellVerticalStyles
                     , undoStack = pushUndo model
+                    , sortState = newSortState
                   }
                 , Command.none
                 )
@@ -156,6 +249,19 @@ update msg model =
             )
 
         InsertColumn index ->
+            let
+                newSortState =
+                    case model.sortState of
+                        SortedBy sortCol dir method ->
+                            if sortCol >= index then
+                                SortedBy (sortCol + 1) dir method
+
+                            else
+                                model.sortState
+
+                        Unsorted ->
+                            Unsorted
+            in
             ( { model
                 | cols = model.cols + 1
                 , cells = insertColumn index model.cells
@@ -165,6 +271,7 @@ update msg model =
                 , cellHorizontalStyles = insertCellStyleCol index model.cellHorizontalStyles
                 , cellVerticalStyles = insertCellVStyleCol index model.cellVerticalStyles
                 , undoStack = pushUndo model
+                , sortState = newSortState
               }
             , Command.none
             )
@@ -209,6 +316,7 @@ update msg model =
                     , showImport = False
                     , importText = ""
                     , undoStack = pushUndo model
+                    , sortState = Unsorted
                   }
                 , Command.none
                 )
@@ -269,6 +377,19 @@ update msg model =
         Undo ->
             case model.undoStack of
                 s :: rest ->
+                    let
+                        newSortState =
+                            case model.sortState of
+                                SortedBy sortCol _ _ ->
+                                    if sortCol >= s.cols then
+                                        Unsorted
+
+                                    else
+                                        model.sortState
+
+                                Unsorted ->
+                                    Unsorted
+                    in
                     ( { model
                         | rows = s.rows
                         , cols = s.cols
@@ -280,12 +401,91 @@ update msg model =
                         , cellHorizontalStyles = s.cellHorizontalStyles
                         , cellVerticalStyles = s.cellVerticalStyles
                         , undoStack = rest
+                        , sortState = newSortState
                       }
                     , Command.none
                     )
 
                 [] ->
                     ( model, Command.none )
+
+        SetSortColumn str ->
+            let
+                newSortState =
+                    case String.toInt str of
+                        Just col ->
+                            if col >= 0 && col < model.cols then
+                                SortedBy col Ascending Lexicographic
+
+                            else
+                                Unsorted
+
+                        Nothing ->
+                            Unsorted
+            in
+            ( { model | sortState = newSortState }, Command.none )
+
+        SetSortDirection dir ->
+            case model.sortState of
+                SortedBy col _ method ->
+                    ( { model | sortState = SortedBy col dir method }, Command.none )
+
+                Unsorted ->
+                    ( model, Command.none )
+
+        SetSortMethod method ->
+            case model.sortState of
+                SortedBy col dir _ ->
+                    ( { model | sortState = SortedBy col dir method }, Command.none )
+
+                Unsorted ->
+                    ( model, Command.none )
+
+        ApplySortToInputs ->
+            let
+                bodyRowOrder =
+                    sortedBodyRows model
+
+                reorderedCells =
+                    bodyRowOrder
+                        |> List.indexedMap
+                            (\i oldRow ->
+                                let
+                                    newRow =
+                                        i + 1
+                                in
+                                List.range 0 (model.cols - 1)
+                                    |> List.filterMap
+                                        (\c ->
+                                            case Dict.get ( oldRow, c ) model.cells of
+                                                Just val ->
+                                                    Just ( ( newRow, c ), val )
+
+                                                Nothing ->
+                                                    Nothing
+                                        )
+                            )
+                        |> List.concat
+
+                headerCells =
+                    List.range 0 (model.cols - 1)
+                        |> List.filterMap
+                            (\c ->
+                                case Dict.get ( 0, c ) model.cells of
+                                    Just val ->
+                                        Just ( ( 0, c ), val )
+
+                                    Nothing ->
+                                        Nothing
+                            )
+            in
+            ( { model
+                | cells = Dict.fromList (headerCells ++ reorderedCells)
+                , sortState = Unsorted
+                , undoStack = pushUndo model
+              }
+            , Command.none
+            )
 
         ToggleSection section ->
             let
@@ -1126,8 +1326,8 @@ parseImportData input =
 -- MARKDOWN GENERATION
 
 
-generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> String
-generateMarkdown format rows cols cells headerAlignments bodyAlignments =
+generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> List Int -> String
+generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowOrder =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1225,7 +1425,7 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments =
                 formatRow 0
 
             dataRows =
-                List.map formatRow (List.range 1 (rows - 1))
+                List.map formatRow bodyRowOrder
         in
         String.join "\n" (headerRow :: separatorRow :: dataRows)
 
@@ -1234,8 +1434,8 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments =
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
-generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> String
+generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1376,16 +1576,56 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                 in
                 leftV ++ " " ++ String.concat (interleave cellTexts (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
 
+            isSorted =
+                bodyRowOrder /= List.range 1 (rows - 1)
+
+            defaultHLine =
+                let
+                    segments =
+                        List.map2
+                            (\_ w -> String.repeat (w + 2) (horizontalChar Thin))
+                            colRange
+                            colWidths
+
+                    innerIntersections =
+                        List.map
+                            (\_ -> lookupCorner WLight WLight WLight WLight)
+                            (List.range 1 (cols - 1))
+
+                    leftC =
+                        lookupCorner WLight WLight WNone WLight
+
+                    rightC =
+                        lookupCorner WLight WLight WLight WNone
+                in
+                leftC ++ String.concat (interleave segments innerIntersections) ++ rightC
+
+            bodyLen =
+                List.length bodyRowOrder
+
             allRows =
-                List.concatMap
-                    (\r ->
-                        if r == 0 then
-                            [ horizontalLine 0, formatRow r ]
+                [ horizontalLine 0, formatRow 0 ]
+                    ++ (if bodyLen > 0 then
+                            horizontalLine 1
+                                :: List.concatMap
+                                    (\( i, r ) ->
+                                        if i < bodyLen - 1 then
+                                            [ formatRow r
+                                            , if isSorted then
+                                                defaultHLine
+
+                                              else
+                                                horizontalLine (r + 1)
+                                            ]
+
+                                        else
+                                            [ formatRow r ]
+                                    )
+                                    (List.indexedMap Tuple.pair bodyRowOrder)
 
                         else
-                            [ horizontalLine r, formatRow r ]
-                    )
-                    rowRange
+                            []
+                       )
                     ++ [ horizontalLine rows ]
         in
         String.join "\n" allRows
@@ -1421,8 +1661,8 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> String
-generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles =
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> String
+generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1538,7 +1778,7 @@ generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyle
                 (indent 2 ++ "<tr>") :: rowCells ++ [ indent 2 ++ "</tr>" ]
 
             bodyRows =
-                List.concatMap bodyRow (List.range 1 (rows - 1))
+                List.concatMap bodyRow bodyRowOrder
 
             bodySection =
                 if rows > 1 then
@@ -1590,6 +1830,34 @@ alignRightIcon =
         [ Svg.line [ SvgAttr.x1 "1", SvgAttr.y1 "3", SvgAttr.x2 "13", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
         , Svg.line [ SvgAttr.x1 "5", SvgAttr.y1 "7", SvgAttr.x2 "13", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
         , Svg.line [ SvgAttr.x1 "3", SvgAttr.y1 "11", SvgAttr.x2 "13", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+sortAscIcon : Html msg
+sortAscIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        , SvgAttr.fill "none"
+        ]
+        [ Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "3", SvgAttr.x2 "12", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "7", SvgAttr.x2 "9", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "11", SvgAttr.x2 "6", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        ]
+
+
+sortDescIcon : Html msg
+sortDescIcon =
+    Svg.svg
+        [ SvgAttr.width "14"
+        , SvgAttr.height "14"
+        , SvgAttr.viewBox "0 0 14 14"
+        , SvgAttr.fill "none"
+        ]
+        [ Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "3", SvgAttr.x2 "6", SvgAttr.y2 "3", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "7", SvgAttr.x2 "9", SvgAttr.y2 "7", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
+        , Svg.line [ SvgAttr.x1 "2", SvgAttr.y1 "11", SvgAttr.x2 "12", SvgAttr.y2 "11", SvgAttr.stroke "currentColor", SvgAttr.strokeWidth "1.5", SvgAttr.strokeLinecap "round" ] []
         ]
 
 
@@ -2106,6 +2374,104 @@ body {
 .section-chevron.collapsed {
     transform: rotate(-90deg);
 }
+
+.sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.sort-controls select {
+    padding: 6px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: white;
+    color: #374151;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.sort-controls select:hover {
+    border-color: #4a90d9;
+}
+
+.sort-controls fieldset {
+    display: inline-flex;
+    align-items: center;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sort-controls legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.sort-pill-group {
+    display: inline-flex;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.sort-pill-group input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.sort-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border: none;
+    border-right: 1px solid #e5e7eb;
+    background: white;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.15s;
+    line-height: 1.2;
+}
+
+.sort-pill:last-child {
+    border-right: none;
+}
+
+.sort-pill:hover {
+    background: #f0f4ff;
+    color: #4a90d9;
+}
+
+.sort-pill.active {
+    background: #4a90d9;
+    color: white;
+}
+
+.sort-pill svg {
+    display: block;
+}
 """
         ]
 
@@ -2123,9 +2489,6 @@ viewTableEditor model =
     let
         colRange =
             List.range 0 (model.cols - 1)
-
-        rowRange =
-            List.range 0 (model.rows - 1)
 
         canDeleteCol =
             model.cols > 1
@@ -2415,17 +2778,19 @@ viewTableEditor model =
                        ]
                 )
 
-        bodyRows =
-            List.concatMap
-                (\r ->
-                    if r == 0 then
-                        [ hSepRow 0, dataRow r ]
+        bodyRowOrder =
+            List.range 1 (model.rows - 1)
 
-                    else
-                        [ hSepRow r, dataRow r ]
-                )
-                rowRange
-                ++ [ hSepRow model.rows, colPillRow ]
+        keyedBodyRows =
+            [ ( "hsep-0", hSepRow 0 ), ( "row-0", dataRow 0 ) ]
+                ++ List.concatMap
+                    (\r ->
+                        [ ( "hsep-" ++ String.fromInt r, hSepRow r )
+                        , ( "row-" ++ String.fromInt r, dataRow r )
+                        ]
+                    )
+                    bodyRowOrder
+                ++ [ ( "hsep-bottom", hSepRow model.rows ), ( "col-pills", colPillRow ) ]
 
         vsepButton vIdx =
             let
@@ -2482,7 +2847,7 @@ viewTableEditor model =
             text ""
         , table [ Attr.class "editor-table" ]
             [ thead [] [ headerAlignmentRow, bodyAlignmentRow ]
-            , tbody [] bodyRows
+            , Html.Keyed.node "tbody" [] keyedBodyRows
             ]
         , div [ Attr.class "button-row" ]
             [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
@@ -2506,7 +2871,151 @@ viewTableEditor model =
                 ]
                 [ text "Undo" ]
             ]
+        , viewSortControls model
         ]
+
+
+viewSortControls : Model -> Html FrontendMsg
+viewSortControls model =
+    let
+        colRange =
+            List.range 0 (model.cols - 1)
+
+        selectedCol =
+            case model.sortState of
+                SortedBy col _ _ ->
+                    String.fromInt col
+
+                Unsorted ->
+                    ""
+
+        columnOption c =
+            let
+                headerText =
+                    getCell 0 c model.cells
+
+                label =
+                    if String.isEmpty (String.trim headerText) then
+                        "Column " ++ String.fromInt (c + 1)
+
+                    else
+                        headerText
+            in
+            option [ Attr.value (String.fromInt c) ] [ text label ]
+
+        sortOptions =
+            case model.sortState of
+                Unsorted ->
+                    []
+
+                SortedBy _ dir method ->
+                    [ button
+                        [ Attr.id "apply-sort-to-inputs"
+                        , Attr.class "add-btn"
+                        , onClick ApplySortToInputs
+                        ]
+                        [ text "Sort inputs to match outputs" ]
+                    , fieldset []
+                        [ legend [] [ text "Direction" ]
+                        , div [ Attr.class "sort-pill-group" ]
+                            [ label
+                                [ Attr.class
+                                    (if dir == Ascending then
+                                        "sort-pill active"
+
+                                     else
+                                        "sort-pill"
+                                    )
+                                ]
+                                [ input
+                                    [ Attr.type_ "radio"
+                                    , Attr.name "sort-direction"
+                                    , Attr.id "sort-asc"
+                                    , Attr.checked (dir == Ascending)
+                                    , onClick (SetSortDirection Ascending)
+                                    ]
+                                    []
+                                , sortAscIcon
+                                , text "Asc"
+                                ]
+                            , label
+                                [ Attr.class
+                                    (if dir == Descending then
+                                        "sort-pill active"
+
+                                     else
+                                        "sort-pill"
+                                    )
+                                ]
+                                [ input
+                                    [ Attr.type_ "radio"
+                                    , Attr.name "sort-direction"
+                                    , Attr.id "sort-desc"
+                                    , Attr.checked (dir == Descending)
+                                    , onClick (SetSortDirection Descending)
+                                    ]
+                                    []
+                                , sortDescIcon
+                                , text "Desc"
+                                ]
+                            ]
+                        ]
+                    , fieldset []
+                        [ legend [] [ text "Method" ]
+                        , div [ Attr.class "sort-pill-group" ]
+                            [ label
+                                [ Attr.class
+                                    (if method == Lexicographic then
+                                        "sort-pill active"
+
+                                     else
+                                        "sort-pill"
+                                    )
+                                ]
+                                [ input
+                                    [ Attr.type_ "radio"
+                                    , Attr.name "sort-method"
+                                    , Attr.id "sort-lex"
+                                    , Attr.checked (method == Lexicographic)
+                                    , onClick (SetSortMethod Lexicographic)
+                                    ]
+                                    []
+                                , text "Text"
+                                ]
+                            , label
+                                [ Attr.class
+                                    (if method == Numeric then
+                                        "sort-pill active"
+
+                                     else
+                                        "sort-pill"
+                                    )
+                                ]
+                                [ input
+                                    [ Attr.type_ "radio"
+                                    , Attr.name "sort-method"
+                                    , Attr.id "sort-num"
+                                    , Attr.checked (method == Numeric)
+                                    , onClick (SetSortMethod Numeric)
+                                    ]
+                                    []
+                                , text "Numeric"
+                                ]
+                            ]
+                        ]
+                    ]
+    in
+    div [ Attr.class "sort-controls" ]
+        (select
+            [ Attr.id "sort-column"
+            , Attr.value selectedCol
+            , onInput SetSortColumn
+            ]
+            (option [ Attr.value "" ] [ text "Sort\u{2026}" ]
+                :: List.map columnOption colRange
+            )
+            :: sortOptions
+        )
 
 
 viewMarkdownOutput : Model -> Html FrontendMsg
@@ -2516,7 +3025,7 @@ viewMarkdownOutput model =
             SeqSet.member MarkdownSection model.collapsedSections
 
         markdown =
-            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments
+            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments (sortedBodyRows model)
     in
     div [ Attr.class "output-section" ]
         (div
@@ -2648,18 +3157,20 @@ viewRenderedTable model =
                     colRange
                 )
 
-        bodyRows =
+        keyedBodyRows =
             List.map
                 (\r ->
-                    tr []
+                    ( "preview-row-" ++ String.fromInt r
+                    , tr []
                         (List.map
                             (\c ->
                                 td (cellAttrs r c) [ text (getCell r c model.cells) ]
                             )
                             colRange
                         )
+                    )
                 )
-                (List.range 1 (model.rows - 1))
+                (sortedBodyRows model)
 
         collapsed =
             SeqSet.member PreviewSection model.collapsedSections
@@ -2695,7 +3206,7 @@ viewRenderedTable model =
                     [ div [ Attr.class "rendered-table-wrapper" ]
                         [ table [ Attr.class "rendered-table" ]
                             [ thead [] [ headerRow ]
-                            , tbody [] bodyRows
+                            , Html.Keyed.node "tbody" [] keyedBodyRows
                             ]
                         ]
                     ]
@@ -2710,7 +3221,7 @@ viewHtmlTableOutput model =
             SeqSet.member HtmlSection model.collapsedSections
 
         htmlTable =
-            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
+            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model)
     in
     div [ Attr.class "output-section" ]
         (div
@@ -2761,7 +3272,7 @@ viewBoxDrawingOutput model =
             SeqSet.member BoxDrawingSection model.collapsedSections
 
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles
+            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model)
     in
     div [ Attr.class "output-section" ]
         (div
