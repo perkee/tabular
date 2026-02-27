@@ -1086,16 +1086,22 @@ hSepLabelTests =
     describe "hSepLabel"
         [ test "index 0 is Top border" <|
             \_ ->
-                Expect.equal "Top border" (hSepLabel 0 3)
-        , test "index == rows is Bottom border" <|
+                Expect.equal "Top border" (hSepLabel 0 3 False)
+        , test "index == rows is Bottom border without summary" <|
             \_ ->
-                Expect.equal "Bottom border" (hSepLabel 3 3)
+                Expect.equal "Bottom border" (hSepLabel 3 3 False)
+        , test "index == rows is Above summary with summary" <|
+            \_ ->
+                Expect.equal "Above summary" (hSepLabel 3 3 True)
+        , test "index > rows is Bottom border with summary" <|
+            \_ ->
+                Expect.equal "Bottom border" (hSepLabel 4 3 True)
         , test "middle index shows row range" <|
             \_ ->
-                Expect.equal "Row 1-2" (hSepLabel 1 3)
+                Expect.equal "Row 1-2" (hSepLabel 1 3 False)
         , test "another middle index" <|
             \_ ->
-                Expect.equal "Row 2-3" (hSepLabel 2 3)
+                Expect.equal "Row 2-3" (hSepLabel 2 3 False)
         ]
 
 

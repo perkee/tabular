@@ -1247,12 +1247,18 @@ lineStyleLabel style =
             "Double"
 
 
-hSepLabel : Int -> Int -> String
-hSepLabel idx rows =
+hSepLabel : Int -> Int -> Bool -> String
+hSepLabel idx rows hasSummary =
     if idx == 0 then
         "Top border"
 
+    else if idx == rows && hasSummary then
+        "Above summary"
+
     else if idx == rows then
+        "Bottom border"
+
+    else if idx > rows then
         "Bottom border"
 
     else
@@ -1815,7 +1821,14 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                             []
                        )
                     ++ summarySection
-                    ++ [ horizontalLine rows ]
+                    ++ [ horizontalLine
+                            (if List.isEmpty summaryRowValues then
+                                rows
+
+                             else
+                                rows + 1
+                            )
+                       ]
         in
         String.join "\n" allRows
 
@@ -2776,6 +2789,9 @@ viewTableEditor model =
         canDeleteRow =
             model.rows > 1
 
+        hasSummary =
+            not (SeqSet.isEmpty model.summaryRows)
+
         colPillRow =
             tr []
                 (td [] []
@@ -2914,7 +2930,7 @@ viewTableEditor model =
                              else
                                 "hsep-setall-btn"
                             )
-                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel rowStyle ++ " (set all)")
+                        , Attr.title (hSepLabel hIdx model.rows hasSummary ++ ": " ++ lineStyleLabel rowStyle ++ " (set all)")
                         , onClick (CycleHorizontalLineStyle hIdx)
                         ]
                         [ text
@@ -2942,7 +2958,7 @@ viewTableEditor model =
                                                  else
                                                     "hsep-btn"
                                                 )
-                                            , Attr.title (hSepLabel hIdx model.rows ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
+                                            , Attr.title (hSepLabel hIdx model.rows hasSummary ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
                                             , onClick (CycleCellHorizontalStyle hIdx c)
                                             ]
                                             [ div
@@ -3203,6 +3219,12 @@ viewTableEditor model =
                     bodyRowOrder
                 ++ [ ( "hsep-bottom", hSepRow model.rows ) ]
                 ++ summaryEntries
+                ++ (if hasSummary then
+                        [ ( "hsep-summary-bottom", hSepRow (model.rows + 1) ) ]
+
+                    else
+                        []
+                   )
                 ++ [ ( "col-pills", colPillRow ) ]
 
         vsepButton vIdx =
