@@ -528,7 +528,6 @@ update msg model =
             in
             ( { model
                 | cells = Dict.fromList (headerCells ++ reorderedCells)
-                , sortState = Unsorted
                 , undoStack = pushUndo model
               }
             , Command.none

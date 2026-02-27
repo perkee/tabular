@@ -409,8 +409,8 @@ test('apply sort to inputs physically reorders cell data', async ({ page }) => {
   await expect(page.locator('#cell-1-0')).toHaveValue('Apple');
   await expect(page.locator('#cell-2-0')).toHaveValue('Cherry');
 
-  // Sort state should be reset to None
-  await expect(page.locator('#sort-asc')).toHaveCount(0);
+  // Sort state should be preserved
+  await expect(page.locator('#sort-column')).toHaveValue('0');
 });
 
 test('apply sort to inputs is undoable', async ({ page }) => {
