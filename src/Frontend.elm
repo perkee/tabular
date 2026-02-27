@@ -3342,10 +3342,15 @@ viewSortSubsection model =
                     []
 
                 SortedBy _ dir method ->
+                    let
+                        alreadySorted =
+                            sortedBodyRows model == List.range 1 (model.rows - 1)
+                    in
                     [ button
                         [ Attr.id "apply-sort-to-inputs"
                         , Attr.class "add-btn"
                         , onClick ApplySortToInputs
+                        , Attr.disabled alreadySorted
                         ]
                         [ text "Sort inputs to match outputs" ]
                     , fieldset []

@@ -411,6 +411,9 @@ test('apply sort to inputs physically reorders cell data', async ({ page }) => {
 
   // Sort state should be preserved
   await expect(page.locator('#sort-column')).toHaveValue('0');
+
+  // Button should be disabled since inputs now match outputs
+  await expect(page.locator('#apply-sort-to-inputs')).toBeDisabled();
 });
 
 test('apply sort to inputs is undoable', async ({ page }) => {
@@ -425,6 +428,19 @@ test('apply sort to inputs is undoable', async ({ page }) => {
   await page.locator('#undo-btn').click();
   await expect(page.locator('#cell-1-0')).toHaveValue('Cherry');
   await expect(page.locator('#cell-2-0')).toHaveValue('Apple');
+});
+
+test('apply sort button is disabled when inputs already match sort order', async ({ page }) => {
+  await page.locator('#cell-1-0').fill('Apple');
+  await page.locator('#cell-2-0').fill('Cherry');
+
+  // Sort ascending by column 0 — inputs are already in ascending order
+  await page.locator('#sort-column').selectOption('0');
+  await expect(page.locator('#apply-sort-to-inputs')).toBeDisabled();
+
+  // Switch to descending — now inputs differ from outputs
+  await page.locator('label', { hasText: 'Desc' }).click();
+  await expect(page.locator('#apply-sort-to-inputs')).toBeEnabled();
 });
 
 test('apply sort button only visible when sorting is active', async ({ page }) => {
