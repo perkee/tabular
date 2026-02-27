@@ -2831,7 +2831,7 @@ viewTableEditor model =
 
         headerAlignmentRow =
             tr []
-                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
+                (td [] []
                     :: List.concatMap
                         (\c ->
                             let
@@ -2863,18 +2863,18 @@ viewTableEditor model =
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
+                    ++ [ td [] [] ]
                 )
 
         bodyAlignmentRow =
             tr []
-                (td [] []
+                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
                     :: List.concatMap
                         (\c ->
                             let
@@ -2906,13 +2906,13 @@ viewTableEditor model =
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [] [] ]
+                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
                 )
 
         hSepRow hIdx =
