@@ -75,8 +75,8 @@ migrate_Types_FrontendModel old =
     , collapsedSections = old.collapsedSections |> SeqSet.map migrate_Types_OutputSection
     , undoStack = old.undoStack |> List.map migrate_Types_TableSnapshot
     , sortState = old.sortState |> migrate_Types_SortState
-    , summaryRows = (Unimplemented {- Type `SeqSet (Evergreen.V7.Types.SummaryFunction)` was added in V7. I need you to set a default value. -})
-    , summarySeparatorStyles = (Unimplemented {- Type `Dict (Int) (Evergreen.V7.Types.LineStyle)` was added in V7. I need you to set a default value. -})
+    , summaryRows = SeqSet.empty
+    , summarySeparatorStyles = Dict.empty
     }
 
 
@@ -170,17 +170,6 @@ migrate_Types_FrontendMsg old =
 
         Evergreen.V6.Types.ApplySortToInputs ->
             Evergreen.V7.Types.ApplySortToInputs
-
-        notices ->
-            {- @NOTICE `ToggleSummaryRow Evergreen.V7.Types.SummaryFunction` was added in V7.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            {- @NOTICE `CycleSummarySeparatorStyle Int` was added in V7.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            (Unimplemented {- New constructors were added. I need you to resolve the above notices and then remove this case. -})
 
 
 migrate_Types_LineStyle : Evergreen.V6.Types.LineStyle -> Evergreen.V7.Types.LineStyle
