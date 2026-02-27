@@ -308,3 +308,131 @@ test('collapsing one section does not affect others', async ({ page }) => {
   await expect(page.locator('#box-output')).toHaveCount(1);
   await expect(page.locator('#html-output')).toHaveCount(1);
 });
+
+// --- Sorting ---
+
+test('sort dropdown lists column headers', async ({ page }) => {
+  const sortSelect = page.locator('#sort-column');
+  await expect(sortSelect).toHaveCount(1);
+
+  // Should have "Sort…" option plus one per column
+  const options = sortSelect.locator('option');
+  await expect(options).toHaveCount(4); // Sort… + Header 1 + Header 2 + Header 3
+  await expect(options.nth(1)).toHaveText('Header 1');
+  await expect(options.nth(2)).toHaveText('Header 2');
+});
+
+test('selecting a sort column shows direction and method radios', async ({ page }) => {
+  // Initially no radios visible
+  await expect(page.locator('#sort-asc')).toHaveCount(0);
+
+  // Select column 0
+  await page.locator('#sort-column').selectOption('0');
+
+  // Radio buttons should appear
+  await expect(page.locator('#sort-asc')).toHaveCount(1);
+  await expect(page.locator('#sort-desc')).toHaveCount(1);
+  await expect(page.locator('#sort-lex')).toHaveCount(1);
+  await expect(page.locator('#sort-num')).toHaveCount(1);
+});
+
+test('selecting None hides radios and restores original order', async ({ page }) => {
+  // Fill some body cells
+  await page.locator('#cell-1-0').fill('B');
+  await page.locator('#cell-2-0').fill('A');
+
+  // Sort by column 0
+  await page.locator('#sort-column').selectOption('0');
+  await expect(page.locator('#sort-asc')).toHaveCount(1);
+
+  // Select None
+  await page.locator('#sort-column').selectOption('');
+  await expect(page.locator('#sort-asc')).toHaveCount(0);
+
+  // Markdown should have B before A (original order)
+  const md = await page.locator('#md-output').inputValue();
+  expect(md.indexOf('B')).toBeLessThan(md.indexOf('A'));
+});
+
+test('sorting by column reorders rows in markdown output', async ({ page }) => {
+  await page.locator('#cell-1-0').fill('Cherry');
+  await page.locator('#cell-2-0').fill('Apple');
+
+  // Sort ascending by column 0
+  await page.locator('#sort-column').selectOption('0');
+
+  const md = await page.locator('#md-output').inputValue();
+  // Apple should come before Cherry in sorted output
+  expect(md.indexOf('Apple')).toBeLessThan(md.indexOf('Cherry'));
+});
+
+test('numeric sort orders numbers correctly', async ({ page }) => {
+  await page.locator('#cell-1-0').fill('10');
+  await page.locator('#cell-2-0').fill('2');
+
+  // Sort by column 0, then switch to numeric
+  await page.locator('#sort-column').selectOption('0');
+  await page.locator('label:has(#sort-num)').click();
+
+  const md = await page.locator('#md-output').inputValue();
+  // Numeric: 2 before 10
+  expect(md.indexOf('2')).toBeLessThan(md.indexOf('10'));
+});
+
+test('sorting does not reorder editor inputs by default', async ({ page }) => {
+  await page.locator('#cell-1-0').fill('Cherry');
+  await page.locator('#cell-2-0').fill('Apple');
+
+  // Sort ascending by column 0
+  await page.locator('#sort-column').selectOption('0');
+
+  // Output should be sorted (Apple before Cherry)
+  const md = await page.locator('#md-output').inputValue();
+  expect(md.indexOf('Apple')).toBeLessThan(md.indexOf('Cherry'));
+
+  // But editor inputs should stay in original order (Cherry in row 1, Apple in row 2)
+  await expect(page.locator('#cell-1-0')).toHaveValue('Cherry');
+  await expect(page.locator('#cell-2-0')).toHaveValue('Apple');
+});
+
+test('apply sort to inputs physically reorders cell data', async ({ page }) => {
+  await page.locator('#cell-1-0').fill('Cherry');
+  await page.locator('#cell-2-0').fill('Apple');
+
+  // Sort ascending by column 0
+  await page.locator('#sort-column').selectOption('0');
+
+  // Click "Sort inputs to match outputs"
+  await page.locator('#apply-sort-to-inputs').click();
+
+  // Cell data should now be physically reordered: Apple in row 1, Cherry in row 2
+  await expect(page.locator('#cell-1-0')).toHaveValue('Apple');
+  await expect(page.locator('#cell-2-0')).toHaveValue('Cherry');
+
+  // Sort state should be reset to None
+  await expect(page.locator('#sort-asc')).toHaveCount(0);
+});
+
+test('apply sort to inputs is undoable', async ({ page }) => {
+  await page.locator('#cell-1-0').fill('Cherry');
+  await page.locator('#cell-2-0').fill('Apple');
+
+  await page.locator('#sort-column').selectOption('0');
+  await page.locator('#apply-sort-to-inputs').click();
+
+  await expect(page.locator('#cell-1-0')).toHaveValue('Apple');
+
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#cell-1-0')).toHaveValue('Cherry');
+  await expect(page.locator('#cell-2-0')).toHaveValue('Apple');
+});
+
+test('apply sort button only visible when sorting is active', async ({ page }) => {
+  await expect(page.locator('#apply-sort-to-inputs')).toHaveCount(0);
+
+  await page.locator('#sort-column').selectOption('0');
+  await expect(page.locator('#apply-sort-to-inputs')).toHaveCount(1);
+
+  await page.locator('#sort-column').selectOption('');
+  await expect(page.locator('#apply-sort-to-inputs')).toHaveCount(0);
+});
