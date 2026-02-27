@@ -436,3 +436,49 @@ test('apply sort button only visible when sorting is active', async ({ page }) =
   await page.locator('#sort-column').selectOption('');
   await expect(page.locator('#apply-sort-to-inputs')).toHaveCount(0);
 });
+
+// --- Summary rows ---
+
+test('summary max toggle button is visible', async ({ page }) => {
+  await expect(page.locator('#summary-max')).toHaveCount(1);
+});
+
+test('clicking max toggle shows summary row in editor', async ({ page }) => {
+  // Fill some numeric data
+  await page.locator('#cell-1-0').fill('Name');
+  await page.locator('#cell-1-1').fill('10');
+  await page.locator('#cell-2-0').fill('Other');
+  await page.locator('#cell-2-1').fill('20');
+
+  await page.locator('#summary-max').click();
+
+  // Summary row should appear in the editor table
+  const summaryRow = page.locator('.editor-table .summary-row');
+  await expect(summaryRow).toHaveCount(1);
+});
+
+test('summary max shows correct computed values in markdown', async ({ page }) => {
+  await page.locator('#cell-1-1').fill('10');
+  await page.locator('#cell-2-1').fill('20');
+
+  await page.locator('#summary-max').click();
+
+  await expect(page.locator('#md-output')).toHaveValue(/\*\*MAX\*\*/);
+  await expect(page.locator('#md-output')).toHaveValue(/\*\*20\*\*/);
+});
+
+test('toggling summary off removes summary row', async ({ page }) => {
+  await page.locator('#cell-1-1').fill('10');
+
+  // Toggle on
+  await page.locator('#summary-max').click();
+  await expect(page.locator('.editor-table .summary-row')).toHaveCount(1);
+
+  // Toggle off
+  await page.locator('#summary-max').click();
+  await expect(page.locator('.editor-table .summary-row')).toHaveCount(0);
+
+  // Markdown should not contain MAX
+  const md = await page.locator('#md-output').inputValue();
+  expect(md).not.toContain('**MAX**');
+});

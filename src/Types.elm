@@ -37,6 +37,7 @@ type alias FrontendModel =
     , collapsedSections : SeqSet OutputSection
     , undoStack : List TableSnapshot
     , sortState : SortState
+    , summaryRows : SeqSet SummaryFunction
     }
 
 
@@ -93,6 +94,10 @@ type SortState
     | SortedBy Int SortDirection SortMethod
 
 
+type SummaryFunction
+    = SummaryMax
+
+
 type alias BackendModel =
     { message : String
     }
@@ -124,6 +129,7 @@ type FrontendMsg
     | SetSortDirection SortDirection
     | SetSortMethod SortMethod
     | ApplySortToInputs
+    | ToggleSummaryRow SummaryFunction
 
 
 type ToBackend

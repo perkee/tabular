@@ -62,6 +62,7 @@ init _ key =
       , collapsedSections = SeqSet.empty
       , undoStack = []
       , sortState = Unsorted
+      , summaryRows = SeqSet.empty
       }
     , Command.none
     )
@@ -97,6 +98,51 @@ extractNumeric s =
 
     else
         String.toFloat filtered
+
+
+summaryLabel : SummaryFunction -> String
+summaryLabel fn =
+    case fn of
+        SummaryMax ->
+            "MAX"
+
+
+formatSummaryValue : Float -> String
+formatSummaryValue f =
+    if f == toFloat (round f) then
+        String.fromInt (round f)
+
+    else
+        String.fromFloat f
+
+
+computeSummaryRow : SummaryFunction -> Int -> Dict ( Int, Int ) String -> List Int -> List String
+computeSummaryRow fn cols cells bodyRowIndices =
+    let
+        colRange =
+            List.range 0 (cols - 1)
+
+        computeCol c =
+            if c == 0 then
+                summaryLabel fn
+
+            else
+                let
+                    values =
+                        List.filterMap
+                            (\r -> extractNumeric (getCell r c cells))
+                            bodyRowIndices
+                in
+                case values of
+                    [] ->
+                        ""
+
+                    _ ->
+                        case fn of
+                            SummaryMax ->
+                                formatSummaryValue (List.foldl max (Maybe.withDefault 0 (List.head values)) values)
+    in
+    List.map computeCol colRange
 
 
 sortedBodyRows : Model -> List Int
@@ -497,6 +543,17 @@ update msg model =
                         SeqSet.insert section model.collapsedSections
             in
             ( { model | collapsedSections = newSections }, Command.none )
+
+        ToggleSummaryRow fn ->
+            let
+                newSummaryRows =
+                    if SeqSet.member fn model.summaryRows then
+                        SeqSet.remove fn model.summaryRows
+
+                    else
+                        SeqSet.insert fn model.summaryRows
+            in
+            ( { model | summaryRows = newSummaryRows }, Command.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -1326,8 +1383,8 @@ parseImportData input =
 -- MARKDOWN GENERATION
 
 
-generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> List Int -> String
-generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowOrder =
+generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> List Int -> List SummaryFunction -> String
+generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowOrder summaryFunctions =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1339,16 +1396,41 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowO
             rowRange =
                 List.range 0 (rows - 1)
 
+            bodyRowIndicesForSummary =
+                List.range 1 (rows - 1)
+
+            summaryTexts =
+                List.map
+                    (\fn -> computeSummaryRow fn cols cells bodyRowIndicesForSummary |> List.map (\v -> "**" ++ v ++ "**"))
+                    summaryFunctions
+
             colWidths =
                 List.map
                     (\c ->
-                        List.foldl
-                            (\r maxW ->
-                                max maxW
-                                    (String.length (escapePipe (getCell r c cells)))
-                            )
-                            3
-                            rowRange
+                        let
+                            cellMax =
+                                List.foldl
+                                    (\r maxW ->
+                                        max maxW
+                                            (String.length (escapePipe (getCell r c cells)))
+                                    )
+                                    3
+                                    rowRange
+
+                            summaryMax =
+                                List.foldl
+                                    (\row maxW ->
+                                        case List.head (List.drop c row) of
+                                            Just v ->
+                                                max maxW (String.length v)
+
+                                            Nothing ->
+                                                maxW
+                                    )
+                                    0
+                                    summaryTexts
+                        in
+                        max cellMax summaryMax
                     )
                     colRange
 
@@ -1426,16 +1508,35 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowO
 
             dataRows =
                 List.map formatRow bodyRowOrder
+
+            summaryRowLines =
+                List.map
+                    (\boldVals ->
+                        let
+                            cellTexts =
+                                case format of
+                                    Compact ->
+                                        boldVals
+
+                                    Expanded ->
+                                        List.map2
+                                            (\v w -> padContent AlignLeft v w)
+                                            boldVals
+                                            colWidths
+                        in
+                        "| " ++ String.join " | " cellTexts ++ " |"
+                    )
+                    summaryTexts
         in
-        String.join "\n" (headerRow :: separatorRow :: dataRows)
+        String.join "\n" (headerRow :: separatorRow :: dataRows ++ summaryRowLines)
 
 
 
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> String
-generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> List SummaryFunction -> String
+generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder summaryFunctions =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1447,13 +1548,38 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
             rowRange =
                 List.range 0 (rows - 1)
 
+            bodyRowIndicesForSummary =
+                List.range 1 (rows - 1)
+
+            summaryRowValues =
+                List.map
+                    (\fn -> computeSummaryRow fn cols cells bodyRowIndicesForSummary)
+                    summaryFunctions
+
             colWidths =
                 List.map
                     (\c ->
-                        List.foldl
-                            (\r maxW -> max maxW (String.length (getCell r c cells)))
-                            1
-                            rowRange
+                        let
+                            cellMax =
+                                List.foldl
+                                    (\r maxW -> max maxW (String.length (getCell r c cells)))
+                                    1
+                                    rowRange
+
+                            summaryMax =
+                                List.foldl
+                                    (\row maxW ->
+                                        case List.head (List.drop c row) of
+                                            Just v ->
+                                                max maxW (String.length v)
+
+                                            Nothing ->
+                                                maxW
+                                    )
+                                    0
+                                    summaryRowValues
+                        in
+                        max cellMax summaryMax
                     )
                     colRange
 
@@ -1603,6 +1729,33 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
             bodyLen =
                 List.length bodyRowOrder
 
+            formatSummaryRowBox vals =
+                let
+                    leftV =
+                        verticalChar Thin
+
+                    rightV =
+                        verticalChar Thin
+
+                    cellTexts =
+                        List.map2
+                            (\v w -> padContent AlignLeft v w)
+                            vals
+                            colWidths
+
+                    innerSeps =
+                        List.map (\_ -> verticalChar Thin) (List.range 1 (cols - 1))
+                in
+                leftV ++ " " ++ String.concat (interleave cellTexts (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
+
+            summarySection =
+                case summaryRowValues of
+                    [] ->
+                        []
+
+                    first :: rest ->
+                        (horizontalLine rows :: formatSummaryRowBox first :: List.concatMap (\vals -> [ defaultHLine, formatSummaryRowBox vals ]) rest)
+
             allRows =
                 [ horizontalLine 0, formatRow 0 ]
                     ++ (if bodyLen > 0 then
@@ -1626,6 +1779,7 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                         else
                             []
                        )
+                    ++ summarySection
                     ++ [ horizontalLine rows ]
         in
         String.join "\n" allRows
@@ -1661,8 +1815,8 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> String
-generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder =
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> List SummaryFunction -> String
+generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder summaryFunctions =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1786,8 +1940,41 @@ generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyle
 
                 else
                     []
+
+            bodyRowIndicesForSummary =
+                List.range 1 (rows - 1)
+
+            footSection =
+                if List.isEmpty summaryFunctions then
+                    []
+
+                else
+                    let
+                        footRows =
+                            List.concatMap
+                                (\fn ->
+                                    let
+                                        vals =
+                                            computeSummaryRow fn cols cells bodyRowIndicesForSummary
+
+                                        footCells =
+                                            List.indexedMap
+                                                (\c v ->
+                                                    if c == 0 then
+                                                        indent 3 ++ "<th scope=\"row\">" ++ escapeHtml v ++ "</th>"
+
+                                                    else
+                                                        indent 3 ++ "<td>" ++ escapeHtml v ++ "</td>"
+                                                )
+                                                vals
+                                    in
+                                    (indent 2 ++ "<tr>") :: footCells ++ [ indent 2 ++ "</tr>" ]
+                                )
+                                summaryFunctions
+                    in
+                    (indent 1 ++ "<tfoot>") :: footRows ++ [ indent 1 ++ "</tfoot>" ]
         in
-        String.join "\n" ("<table>" :: headerSection ++ bodySection ++ [ "</table>" ])
+        String.join "\n" ("<table>" :: headerSection ++ bodySection ++ footSection ++ [ "</table>" ])
 
 
 
@@ -2472,6 +2659,38 @@ body {
 .sort-pill svg {
     display: block;
 }
+
+.summary-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.sort-controls-label {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.summary-row td,
+.summary-row th {
+    background: #f3f4f6 !important;
+}
+
+.summary-row .cell-input {
+    background: #f3f4f6;
+    color: #6b7280;
+    font-weight: 600;
+    cursor: default;
+}
+
+.rendered-table tfoot td,
+.rendered-table tfoot th {
+    background: #f3f4f6;
+    color: #6b7280;
+    font-weight: 600;
+}
 """
         ]
 
@@ -2781,6 +3000,58 @@ viewTableEditor model =
         bodyRowOrder =
             List.range 1 (model.rows - 1)
 
+        summaryRowEditor fn =
+            let
+                vals =
+                    computeSummaryRow fn model.cols model.cells (List.range 1 (model.rows - 1))
+            in
+            tr [ Attr.class "summary-row" ]
+                (td [] []
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                cellVal =
+                                    case List.head (List.drop c vals) of
+                                        Just v ->
+                                            v
+
+                                        Nothing ->
+                                            ""
+
+                                cellTd =
+                                    td []
+                                        [ input
+                                            [ Attr.class
+                                                (if c == 0 then
+                                                    "cell-input header-cell"
+
+                                                 else
+                                                    "cell-input"
+                                                )
+                                            , Attr.value cellVal
+                                            , Attr.readonly True
+                                            , Attr.tabindex -1
+                                            ]
+                                            []
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ cellTd, td [ Attr.class "vsep-cell" ] [] ]
+
+                            else
+                                [ cellTd ]
+                        )
+                        colRange
+                    ++ [ td [] [] ]
+                )
+
+        summaryEntries =
+            List.map
+                (\fn ->
+                    ( "summary-" ++ summaryLabel fn, summaryRowEditor fn )
+                )
+                (SeqSet.toList model.summaryRows)
+
         keyedBodyRows =
             [ ( "hsep-0", hSepRow 0 ), ( "row-0", dataRow 0 ) ]
                 ++ List.concatMap
@@ -2790,7 +3061,9 @@ viewTableEditor model =
                         ]
                     )
                     bodyRowOrder
-                ++ [ ( "hsep-bottom", hSepRow model.rows ), ( "col-pills", colPillRow ) ]
+                ++ [ ( "hsep-bottom", hSepRow model.rows ) ]
+                ++ summaryEntries
+                ++ [ ( "col-pills", colPillRow ) ]
 
         vsepButton vIdx =
             let
@@ -2872,6 +3145,7 @@ viewTableEditor model =
                 [ text "Undo" ]
             ]
         , viewSortControls model
+        , viewSummaryControls model
         ]
 
 
@@ -3018,6 +3292,29 @@ viewSortControls model =
         )
 
 
+viewSummaryControls : Model -> Html FrontendMsg
+viewSummaryControls model =
+    let
+        isActive fn =
+            SeqSet.member fn model.summaryRows
+    in
+    div [ Attr.class "summary-controls" ]
+        [ span [ Attr.class "sort-controls-label" ] [ text "Summary:" ]
+        , button
+            [ Attr.id "summary-max"
+            , Attr.class
+                (if isActive SummaryMax then
+                    "sort-pill active"
+
+                 else
+                    "sort-pill"
+                )
+            , onClick (ToggleSummaryRow SummaryMax)
+            ]
+            [ text "Max" ]
+        ]
+
+
 viewMarkdownOutput : Model -> Html FrontendMsg
 viewMarkdownOutput model =
     let
@@ -3025,7 +3322,7 @@ viewMarkdownOutput model =
             SeqSet.member MarkdownSection model.collapsedSections
 
         markdown =
-            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments (sortedBodyRows model)
+            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments (sortedBodyRows model) (SeqSet.toList model.summaryRows)
     in
     div [ Attr.class "output-section" ]
         (div
@@ -3172,6 +3469,39 @@ viewRenderedTable model =
                 )
                 (sortedBodyRows model)
 
+        summaryFunctions =
+            SeqSet.toList model.summaryRows
+
+        bodyRowIndicesForSummary =
+            List.range 1 (model.rows - 1)
+
+        previewTfoot =
+            if List.isEmpty summaryFunctions then
+                text ""
+
+            else
+                tfoot []
+                    (List.map
+                        (\fn ->
+                            let
+                                vals =
+                                    computeSummaryRow fn model.cols model.cells bodyRowIndicesForSummary
+                            in
+                            tr [ Attr.class "summary-row" ]
+                                (List.indexedMap
+                                    (\c v ->
+                                        if c == 0 then
+                                            th [ Attr.style "text-align" "left" ] [ text v ]
+
+                                        else
+                                            td [] [ text v ]
+                                    )
+                                    vals
+                                )
+                        )
+                        summaryFunctions
+                    )
+
         collapsed =
             SeqSet.member PreviewSection model.collapsedSections
     in
@@ -3207,6 +3537,7 @@ viewRenderedTable model =
                         [ table [ Attr.class "rendered-table" ]
                             [ thead [] [ headerRow ]
                             , Html.Keyed.node "tbody" [] keyedBodyRows
+                            , previewTfoot
                             ]
                         ]
                     ]
@@ -3221,7 +3552,7 @@ viewHtmlTableOutput model =
             SeqSet.member HtmlSection model.collapsedSections
 
         htmlTable =
-            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model)
+            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model) (SeqSet.toList model.summaryRows)
     in
     div [ Attr.class "output-section" ]
         (div
@@ -3272,7 +3603,7 @@ viewBoxDrawingOutput model =
             SeqSet.member BoxDrawingSection model.collapsedSections
 
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model)
+            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model) (SeqSet.toList model.summaryRows)
     in
     div [ Attr.class "output-section" ]
         (div
