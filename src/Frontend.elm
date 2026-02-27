@@ -63,6 +63,7 @@ init _ key =
       , undoStack = []
       , sortState = Unsorted
       , summaryRows = SeqSet.empty
+      , summarySeparatorStyles = Dict.empty
       }
     , Command.none
     )
@@ -554,6 +555,15 @@ update msg model =
                         SeqSet.insert fn model.summaryRows
             in
             ( { model | summaryRows = newSummaryRows }, Command.none )
+
+        CycleSummarySeparatorStyle idx ->
+            let
+                current =
+                    Dict.get idx model.summarySeparatorStyles |> Maybe.withDefault Thin
+            in
+            ( { model | summarySeparatorStyles = Dict.insert idx (cycleLineStyle current) model.summarySeparatorStyles }
+            , Command.none
+            )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -1535,8 +1545,8 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowO
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> List SummaryFunction -> String
-generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder summaryFunctions =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> List SummaryFunction -> Dict Int LineStyle -> String
+generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder summaryFunctions summarySepStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1748,13 +1758,39 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                 in
                 leftV ++ " " ++ String.concat (interleave cellTexts (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
 
+            summarySepLine sepIdx =
+                let
+                    style =
+                        Dict.get sepIdx summarySepStyles |> Maybe.withDefault Thin
+
+                    segments =
+                        List.map2
+                            (\_ w -> String.repeat (w + 2) (horizontalChar style))
+                            colRange
+                            colWidths
+
+                    innerIntersections =
+                        List.map
+                            (\_ -> lookupCorner WLight WLight (lineStyleWeight style) (lineStyleWeight style))
+                            (List.range 1 (cols - 1))
+
+                    leftC =
+                        lookupCorner WLight WLight WNone (lineStyleWeight style)
+
+                    rightC =
+                        lookupCorner WLight WLight (lineStyleWeight style) WNone
+                in
+                leftC ++ String.concat (interleave segments innerIntersections) ++ rightC
+
             summarySection =
                 case summaryRowValues of
                     [] ->
                         []
 
                     first :: rest ->
-                        (horizontalLine rows :: formatSummaryRowBox first :: List.concatMap (\vals -> [ defaultHLine, formatSummaryRowBox vals ]) rest)
+                        horizontalLine rows
+                            :: formatSummaryRowBox first
+                            :: List.concat (List.indexedMap (\i vals -> [ summarySepLine i, formatSummaryRowBox vals ]) rest)
 
             allRows =
                 [ horizontalLine 0, formatRow 0 ]
@@ -3045,12 +3081,91 @@ viewTableEditor model =
                     ++ [ td [] [] ]
                 )
 
-        summaryEntries =
-            List.map
-                (\fn ->
-                    ( "summary-" ++ summaryLabel fn, summaryRowEditor fn )
+        summaryHSepRow sepIdx =
+            let
+                sepStyle =
+                    Dict.get sepIdx model.summarySeparatorStyles |> Maybe.withDefault Thin
+            in
+            tr [ Attr.class "hsep-row" ]
+                (td [ Attr.style "padding" "0" ]
+                    [ button
+                        [ Attr.class
+                            (if sepStyle == None then
+                                "hsep-setall-btn hsep-none"
+
+                             else
+                                "hsep-setall-btn"
+                            )
+                        , Attr.title ("Summary separator " ++ String.fromInt (sepIdx + 1) ++ ": " ++ lineStyleLabel sepStyle)
+                        , onClick (CycleSummarySeparatorStyle sepIdx)
+                        ]
+                        [ text
+                            (if sepStyle == None then
+                                "Ø"
+
+                             else
+                                horizontalChar sepStyle
+                            )
+                        ]
+                    ]
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                segmentTd =
+                                    td [ Attr.style "padding" "0" ]
+                                        [ button
+                                            [ Attr.class
+                                                (if sepStyle == None then
+                                                    "hsep-btn hsep-none"
+
+                                                 else
+                                                    "hsep-btn"
+                                                )
+                                            , Attr.title ("Summary separator " ++ String.fromInt (sepIdx + 1) ++ ": " ++ lineStyleLabel sepStyle)
+                                            , onClick (CycleSummarySeparatorStyle sepIdx)
+                                            ]
+                                            [ div
+                                                [ Attr.class "hsep-indicator"
+                                                , Attr.style "border-top"
+                                                    (if sepStyle == None then
+                                                        "1px dotted #d0d0d0"
+
+                                                     else
+                                                        lineStyleToCss sepStyle ++ " #4a90d9"
+                                                    )
+                                                ]
+                                                []
+                                            ]
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ segmentTd, td [ Attr.class "vsep-cell", Attr.style "padding" "0" ] [] ]
+
+                            else
+                                [ segmentTd ]
+                        )
+                        colRange
+                    ++ [ td [ Attr.style "padding" "0" ] [] ]
                 )
-                (SeqSet.toList model.summaryRows)
+
+        summaryEntries =
+            let
+                fns =
+                    SeqSet.toList model.summaryRows
+            in
+            List.concat
+                (List.indexedMap
+                    (\i fn ->
+                        if i > 0 then
+                            [ ( "summary-hsep-" ++ String.fromInt (i - 1), summaryHSepRow (i - 1) )
+                            , ( "summary-" ++ summaryLabel fn, summaryRowEditor fn )
+                            ]
+
+                        else
+                            [ ( "summary-" ++ summaryLabel fn, summaryRowEditor fn ) ]
+                    )
+                    fns
+                )
 
         keyedBodyRows =
             [ ( "hsep-0", hSepRow 0 ), ( "row-0", dataRow 0 ) ]
@@ -3603,7 +3718,7 @@ viewBoxDrawingOutput model =
             SeqSet.member BoxDrawingSection model.collapsedSections
 
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model) (SeqSet.toList model.summaryRows)
+            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model) (SeqSet.toList model.summaryRows) model.summarySeparatorStyles
     in
     div [ Attr.class "output-section" ]
         (div

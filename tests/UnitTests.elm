@@ -276,7 +276,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( ( 0, 0 ), "A" ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [] []
+                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [] [] Dict.empty
                 in
                 Expect.equal "┌───┐\n│ A │\n└───┘" result
         , test "basic 2x2 table with Thin borders" <|
@@ -291,12 +291,12 @@ generateBoxDrawingTests =
                             ]
 
                     result =
-                        generateBoxDrawing 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] []
+                        generateBoxDrawing 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] [] Dict.empty
                 in
                 Expect.equal "┌───┬───┐\n│ A │ B │\n├───┼───┤\n│ C │ D │\n└───┴───┘" result
         , test "empty table returns empty string" <|
             \_ ->
-                Expect.equal "" (generateBoxDrawing 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [] [])
+                Expect.equal "" (generateBoxDrawing 0 1 Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [] [] Dict.empty)
         , test "alignment affects cell padding" <|
             \_ ->
                 let
@@ -307,7 +307,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( 0, AlignRight ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells alignRight alignRight Dict.empty Dict.empty Dict.empty Dict.empty [] []
+                        generateBoxDrawing 1 1 cells alignRight alignRight Dict.empty Dict.empty Dict.empty Dict.empty [] [] Dict.empty
                 in
                 -- Right aligned: "AB" should be right-padded
                 Expect.equal True
@@ -325,7 +325,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( 0, Double ), ( 1, Double ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty [] []
+                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty [] [] Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "═" r)
@@ -346,7 +346,7 @@ generateBoxDrawingTests =
                         Dict.fromList [ ( 0, Thick ), ( 1, Thick ) ]
 
                     result =
-                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty [] []
+                        generateBoxDrawing 1 1 cells Dict.empty Dict.empty hStyles vStyles Dict.empty Dict.empty [] [] Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "━" r)
@@ -1429,7 +1429,7 @@ summaryInBoxDrawingTests =
                             ]
 
                     result =
-                        generateBoxDrawing 3 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1, 2 ] [ SummaryMax ]
+                        generateBoxDrawing 3 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1, 2 ] [ SummaryMax ] Dict.empty
                 in
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "MAX" r)

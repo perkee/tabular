@@ -38,6 +38,7 @@ type alias FrontendModel =
     , undoStack : List TableSnapshot
     , sortState : SortState
     , summaryRows : SeqSet SummaryFunction
+    , summarySeparatorStyles : Dict Int LineStyle
     }
 
 
@@ -130,6 +131,7 @@ type FrontendMsg
     | SetSortMethod SortMethod
     | ApplySortToInputs
     | ToggleSummaryRow SummaryFunction
+    | CycleSummarySeparatorStyle Int
 
 
 type ToBackend
