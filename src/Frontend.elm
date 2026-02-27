@@ -62,6 +62,8 @@ init _ key =
       , collapsedSections = SeqSet.empty
       , undoStack = []
       , sortState = Unsorted
+      , summaryRows = SeqSet.empty
+      , summarySeparatorStyles = Dict.empty
       }
     , Command.none
     )
@@ -97,6 +99,51 @@ extractNumeric s =
 
     else
         String.toFloat filtered
+
+
+summaryLabel : SummaryFunction -> String
+summaryLabel fn =
+    case fn of
+        SummaryMax ->
+            "MAX"
+
+
+formatSummaryValue : Float -> String
+formatSummaryValue f =
+    if f == toFloat (round f) then
+        String.fromInt (round f)
+
+    else
+        String.fromFloat f
+
+
+computeSummaryRow : SummaryFunction -> Int -> Dict ( Int, Int ) String -> List Int -> List String
+computeSummaryRow fn cols cells bodyRowIndices =
+    let
+        colRange =
+            List.range 0 (cols - 1)
+
+        computeCol c =
+            if c == 0 then
+                summaryLabel fn
+
+            else
+                let
+                    values =
+                        List.filterMap
+                            (\r -> extractNumeric (getCell r c cells))
+                            bodyRowIndices
+                in
+                case values of
+                    [] ->
+                        ""
+
+                    _ ->
+                        case fn of
+                            SummaryMax ->
+                                formatSummaryValue (List.foldl max (Maybe.withDefault 0 (List.head values)) values)
+    in
+    List.map computeCol colRange
 
 
 sortedBodyRows : Model -> List Int
@@ -481,7 +528,6 @@ update msg model =
             in
             ( { model
                 | cells = Dict.fromList (headerCells ++ reorderedCells)
-                , sortState = Unsorted
                 , undoStack = pushUndo model
               }
             , Command.none
@@ -497,6 +543,26 @@ update msg model =
                         SeqSet.insert section model.collapsedSections
             in
             ( { model | collapsedSections = newSections }, Command.none )
+
+        ToggleSummaryRow fn ->
+            let
+                newSummaryRows =
+                    if SeqSet.member fn model.summaryRows then
+                        SeqSet.remove fn model.summaryRows
+
+                    else
+                        SeqSet.insert fn model.summaryRows
+            in
+            ( { model | summaryRows = newSummaryRows }, Command.none )
+
+        CycleSummarySeparatorStyle idx ->
+            let
+                current =
+                    Dict.get idx model.summarySeparatorStyles |> Maybe.withDefault Thin
+            in
+            ( { model | summarySeparatorStyles = Dict.insert idx (cycleLineStyle current) model.summarySeparatorStyles }
+            , Command.none
+            )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
@@ -1181,12 +1247,18 @@ lineStyleLabel style =
             "Double"
 
 
-hSepLabel : Int -> Int -> String
-hSepLabel idx rows =
+hSepLabel : Int -> Int -> Bool -> String
+hSepLabel idx rows hasSummary =
     if idx == 0 then
         "Top border"
 
+    else if idx == rows && hasSummary then
+        "Above summary"
+
     else if idx == rows then
+        "Bottom border"
+
+    else if idx > rows then
         "Bottom border"
 
     else
@@ -1326,8 +1398,8 @@ parseImportData input =
 -- MARKDOWN GENERATION
 
 
-generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> List Int -> String
-generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowOrder =
+generateMarkdown : OutputFormat -> Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> List Int -> List SummaryFunction -> String
+generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowOrder summaryFunctions =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1339,16 +1411,41 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowO
             rowRange =
                 List.range 0 (rows - 1)
 
+            bodyRowIndicesForSummary =
+                List.range 1 (rows - 1)
+
+            summaryTexts =
+                List.map
+                    (\fn -> computeSummaryRow fn cols cells bodyRowIndicesForSummary |> List.map (\v -> "**" ++ v ++ "**"))
+                    summaryFunctions
+
             colWidths =
                 List.map
                     (\c ->
-                        List.foldl
-                            (\r maxW ->
-                                max maxW
-                                    (String.length (escapePipe (getCell r c cells)))
-                            )
-                            3
-                            rowRange
+                        let
+                            cellMax =
+                                List.foldl
+                                    (\r maxW ->
+                                        max maxW
+                                            (String.length (escapePipe (getCell r c cells)))
+                                    )
+                                    3
+                                    rowRange
+
+                            summaryMax =
+                                List.foldl
+                                    (\row maxW ->
+                                        case List.head (List.drop c row) of
+                                            Just v ->
+                                                max maxW (String.length v)
+
+                                            Nothing ->
+                                                maxW
+                                    )
+                                    0
+                                    summaryTexts
+                        in
+                        max cellMax summaryMax
                     )
                     colRange
 
@@ -1426,16 +1523,35 @@ generateMarkdown format rows cols cells headerAlignments bodyAlignments bodyRowO
 
             dataRows =
                 List.map formatRow bodyRowOrder
+
+            summaryRowLines =
+                List.map
+                    (\boldVals ->
+                        let
+                            cellTexts =
+                                case format of
+                                    Compact ->
+                                        boldVals
+
+                                    Expanded ->
+                                        List.map2
+                                            (\v w -> padContent AlignLeft v w)
+                                            boldVals
+                                            colWidths
+                        in
+                        "| " ++ String.join " | " cellTexts ++ " |"
+                    )
+                    summaryTexts
         in
-        String.join "\n" (headerRow :: separatorRow :: dataRows)
+        String.join "\n" (headerRow :: separatorRow :: dataRows ++ summaryRowLines)
 
 
 
 -- BOX DRAWING GENERATION
 
 
-generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> String
-generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder =
+generateBoxDrawing : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> List SummaryFunction -> Dict Int LineStyle -> String
+generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder summaryFunctions summarySepStyles =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1447,13 +1563,38 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
             rowRange =
                 List.range 0 (rows - 1)
 
+            bodyRowIndicesForSummary =
+                List.range 1 (rows - 1)
+
+            summaryRowValues =
+                List.map
+                    (\fn -> computeSummaryRow fn cols cells bodyRowIndicesForSummary)
+                    summaryFunctions
+
             colWidths =
                 List.map
                     (\c ->
-                        List.foldl
-                            (\r maxW -> max maxW (String.length (getCell r c cells)))
-                            1
-                            rowRange
+                        let
+                            cellMax =
+                                List.foldl
+                                    (\r maxW -> max maxW (String.length (getCell r c cells)))
+                                    1
+                                    rowRange
+
+                            summaryMax =
+                                List.foldl
+                                    (\row maxW ->
+                                        case List.head (List.drop c row) of
+                                            Just v ->
+                                                max maxW (String.length v)
+
+                                            Nothing ->
+                                                maxW
+                                    )
+                                    0
+                                    summaryRowValues
+                        in
+                        max cellMax summaryMax
                     )
                     colRange
 
@@ -1603,6 +1744,59 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
             bodyLen =
                 List.length bodyRowOrder
 
+            formatSummaryRowBox vals =
+                let
+                    leftV =
+                        verticalChar Thin
+
+                    rightV =
+                        verticalChar Thin
+
+                    cellTexts =
+                        List.map2
+                            (\v w -> padContent AlignLeft v w)
+                            vals
+                            colWidths
+
+                    innerSeps =
+                        List.map (\_ -> verticalChar Thin) (List.range 1 (cols - 1))
+                in
+                leftV ++ " " ++ String.concat (interleave cellTexts (List.map (\s -> " " ++ s ++ " ") innerSeps)) ++ " " ++ rightV
+
+            summarySepLine sepIdx =
+                let
+                    style =
+                        Dict.get sepIdx summarySepStyles |> Maybe.withDefault Thin
+
+                    segments =
+                        List.map2
+                            (\_ w -> String.repeat (w + 2) (horizontalChar style))
+                            colRange
+                            colWidths
+
+                    innerIntersections =
+                        List.map
+                            (\_ -> lookupCorner WLight WLight (lineStyleWeight style) (lineStyleWeight style))
+                            (List.range 1 (cols - 1))
+
+                    leftC =
+                        lookupCorner WLight WLight WNone (lineStyleWeight style)
+
+                    rightC =
+                        lookupCorner WLight WLight (lineStyleWeight style) WNone
+                in
+                leftC ++ String.concat (interleave segments innerIntersections) ++ rightC
+
+            summarySection =
+                case summaryRowValues of
+                    [] ->
+                        []
+
+                    first :: rest ->
+                        horizontalLine rows
+                            :: formatSummaryRowBox first
+                            :: List.concat (List.indexedMap (\i vals -> [ summarySepLine i, formatSummaryRowBox vals ]) rest)
+
             allRows =
                 [ horizontalLine 0, formatRow 0 ]
                     ++ (if bodyLen > 0 then
@@ -1626,7 +1820,15 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                         else
                             []
                        )
-                    ++ [ horizontalLine rows ]
+                    ++ summarySection
+                    ++ [ horizontalLine
+                            (if List.isEmpty summaryRowValues then
+                                rows
+
+                             else
+                                rows + 1
+                            )
+                       ]
         in
         String.join "\n" allRows
 
@@ -1661,8 +1863,8 @@ alignmentToStyle align =
             "right"
 
 
-generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> String
-generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder =
+generateHtmlTable : Int -> Int -> Dict ( Int, Int ) String -> Dict Int Alignment -> Dict Int Alignment -> Dict Int LineStyle -> Dict Int LineStyle -> Dict ( Int, Int ) LineStyle -> Dict ( Int, Int ) LineStyle -> List Int -> List SummaryFunction -> String
+generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyles cellHStyles cellVStyles bodyRowOrder summaryFunctions =
     if rows == 0 || cols == 0 then
         ""
 
@@ -1786,8 +1988,41 @@ generateHtmlTable rows cols cells headerAlignments bodyAlignments hStyles vStyle
 
                 else
                     []
+
+            bodyRowIndicesForSummary =
+                List.range 1 (rows - 1)
+
+            footSection =
+                if List.isEmpty summaryFunctions then
+                    []
+
+                else
+                    let
+                        footRows =
+                            List.concatMap
+                                (\fn ->
+                                    let
+                                        vals =
+                                            computeSummaryRow fn cols cells bodyRowIndicesForSummary
+
+                                        footCells =
+                                            List.indexedMap
+                                                (\c v ->
+                                                    if c == 0 then
+                                                        indent 3 ++ "<th scope=\"row\">" ++ escapeHtml v ++ "</th>"
+
+                                                    else
+                                                        indent 3 ++ "<td>" ++ escapeHtml v ++ "</td>"
+                                                )
+                                                vals
+                                    in
+                                    (indent 2 ++ "<tr>") :: footCells ++ [ indent 2 ++ "</tr>" ]
+                                )
+                                summaryFunctions
+                    in
+                    (indent 1 ++ "<tfoot>") :: footRows ++ [ indent 1 ++ "</tfoot>" ]
         in
-        String.join "\n" ("<table>" :: headerSection ++ bodySection ++ [ "</table>" ])
+        String.join "\n" ("<table>" :: headerSection ++ bodySection ++ footSection ++ [ "</table>" ])
 
 
 
@@ -2380,7 +2615,6 @@ body {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    margin-top: 12px;
 }
 
 .sort-controls select {
@@ -2472,6 +2706,65 @@ body {
 .sort-pill svg {
     display: block;
 }
+
+.editor-subsections {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.editor-subsection {
+    flex: 1;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #fafafa;
+}
+
+.subsection-header {
+    margin-bottom: 8px;
+}
+
+.subsection-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+
+button.subsection-title {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.summary-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.summary-row td,
+.summary-row th {
+    background: #f3f4f6 !important;
+}
+
+.summary-row .cell-input {
+    background: #f3f4f6;
+    color: #6b7280;
+    font-weight: 600;
+    cursor: default;
+}
+
+.rendered-table tfoot td,
+.rendered-table tfoot th {
+    background: #f3f4f6;
+    color: #6b7280;
+    font-weight: 600;
+}
 """
         ]
 
@@ -2495,6 +2788,9 @@ viewTableEditor model =
 
         canDeleteRow =
             model.rows > 1
+
+        hasSummary =
+            not (SeqSet.isEmpty model.summaryRows)
 
         colPillRow =
             tr []
@@ -2535,7 +2831,7 @@ viewTableEditor model =
 
         headerAlignmentRow =
             tr []
-                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
+                (td [] []
                     :: List.concatMap
                         (\c ->
                             let
@@ -2567,18 +2863,18 @@ viewTableEditor model =
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
+                    ++ [ td [] [] ]
                 )
 
         bodyAlignmentRow =
             tr []
-                (td [] []
+                (td [ Attr.style "text-align" "center" ] [ vsepButton 0 ]
                     :: List.concatMap
                         (\c ->
                             let
@@ -2610,13 +2906,13 @@ viewTableEditor model =
                                         ]
                             in
                             if c < model.cols - 1 then
-                                [ alignTd, td [ Attr.class "vsep-cell" ] [] ]
+                                [ alignTd, td [ Attr.class "vsep-cell" ] [ vsepButton (c + 1) ] ]
 
                             else
                                 [ alignTd ]
                         )
                         colRange
-                    ++ [ td [] [] ]
+                    ++ [ td [ Attr.style "text-align" "center" ] [ vsepButton model.cols ] ]
                 )
 
         hSepRow hIdx =
@@ -2634,7 +2930,7 @@ viewTableEditor model =
                              else
                                 "hsep-setall-btn"
                             )
-                        , Attr.title (hSepLabel hIdx model.rows ++ ": " ++ lineStyleLabel rowStyle ++ " (set all)")
+                        , Attr.title (hSepLabel hIdx model.rows hasSummary ++ ": " ++ lineStyleLabel rowStyle ++ " (set all)")
                         , onClick (CycleHorizontalLineStyle hIdx)
                         ]
                         [ text
@@ -2662,7 +2958,7 @@ viewTableEditor model =
                                                  else
                                                     "hsep-btn"
                                                 )
-                                            , Attr.title (hSepLabel hIdx model.rows ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
+                                            , Attr.title (hSepLabel hIdx model.rows hasSummary ++ " col " ++ String.fromInt (c + 1) ++ ": " ++ lineStyleLabel effectiveStyle)
                                             , onClick (CycleCellHorizontalStyle hIdx c)
                                             ]
                                             [ div
@@ -2781,6 +3077,137 @@ viewTableEditor model =
         bodyRowOrder =
             List.range 1 (model.rows - 1)
 
+        summaryRowEditor fn =
+            let
+                vals =
+                    computeSummaryRow fn model.cols model.cells (List.range 1 (model.rows - 1))
+            in
+            tr [ Attr.class "summary-row" ]
+                (td [] []
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                cellVal =
+                                    case List.head (List.drop c vals) of
+                                        Just v ->
+                                            v
+
+                                        Nothing ->
+                                            ""
+
+                                cellTd =
+                                    td []
+                                        [ input
+                                            [ Attr.class
+                                                (if c == 0 then
+                                                    "cell-input header-cell"
+
+                                                 else
+                                                    "cell-input"
+                                                )
+                                            , Attr.value cellVal
+                                            , Attr.readonly True
+                                            , Attr.tabindex -1
+                                            ]
+                                            []
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ cellTd, td [ Attr.class "vsep-cell" ] [] ]
+
+                            else
+                                [ cellTd ]
+                        )
+                        colRange
+                    ++ [ td [] [] ]
+                )
+
+        summaryHSepRow sepIdx =
+            let
+                sepStyle =
+                    Dict.get sepIdx model.summarySeparatorStyles |> Maybe.withDefault Thin
+            in
+            tr [ Attr.class "hsep-row" ]
+                (td [ Attr.style "padding" "0" ]
+                    [ button
+                        [ Attr.class
+                            (if sepStyle == None then
+                                "hsep-setall-btn hsep-none"
+
+                             else
+                                "hsep-setall-btn"
+                            )
+                        , Attr.title ("Summary separator " ++ String.fromInt (sepIdx + 1) ++ ": " ++ lineStyleLabel sepStyle)
+                        , onClick (CycleSummarySeparatorStyle sepIdx)
+                        ]
+                        [ text
+                            (if sepStyle == None then
+                                "Ø"
+
+                             else
+                                horizontalChar sepStyle
+                            )
+                        ]
+                    ]
+                    :: List.concatMap
+                        (\c ->
+                            let
+                                segmentTd =
+                                    td [ Attr.style "padding" "0" ]
+                                        [ button
+                                            [ Attr.class
+                                                (if sepStyle == None then
+                                                    "hsep-btn hsep-none"
+
+                                                 else
+                                                    "hsep-btn"
+                                                )
+                                            , Attr.title ("Summary separator " ++ String.fromInt (sepIdx + 1) ++ ": " ++ lineStyleLabel sepStyle)
+                                            , onClick (CycleSummarySeparatorStyle sepIdx)
+                                            ]
+                                            [ div
+                                                [ Attr.class "hsep-indicator"
+                                                , Attr.style "border-top"
+                                                    (if sepStyle == None then
+                                                        "1px dotted #d0d0d0"
+
+                                                     else
+                                                        lineStyleToCss sepStyle ++ " #4a90d9"
+                                                    )
+                                                ]
+                                                []
+                                            ]
+                                        ]
+                            in
+                            if c < model.cols - 1 then
+                                [ segmentTd, td [ Attr.class "vsep-cell", Attr.style "padding" "0" ] [] ]
+
+                            else
+                                [ segmentTd ]
+                        )
+                        colRange
+                    ++ [ td [ Attr.style "padding" "0" ] [] ]
+                )
+
+        summaryEntries =
+            let
+                fns =
+                    SeqSet.toList model.summaryRows
+            in
+            List.concat
+                (List.indexedMap
+                    (\i fn ->
+                        if i > 0 then
+                            [ ( "summary-hsep-" ++ String.fromInt (i - 1), summaryHSepRow (i - 1) )
+                            , ( "summary-" ++ summaryLabel fn, summaryRowEditor fn )
+                            ]
+
+                        else
+                            [ ( "summary-" ++ summaryLabel fn, summaryRowEditor fn ) ]
+                    )
+                    fns
+                )
+
         keyedBodyRows =
             [ ( "hsep-0", hSepRow 0 ), ( "row-0", dataRow 0 ) ]
                 ++ List.concatMap
@@ -2790,7 +3217,15 @@ viewTableEditor model =
                         ]
                     )
                     bodyRowOrder
-                ++ [ ( "hsep-bottom", hSepRow model.rows ), ( "col-pills", colPillRow ) ]
+                ++ [ ( "hsep-bottom", hSepRow model.rows ) ]
+                ++ summaryEntries
+                ++ (if hasSummary then
+                        [ ( "hsep-summary-bottom", hSepRow (model.rows + 1) ) ]
+
+                    else
+                        []
+                   )
+                ++ [ ( "col-pills", colPillRow ) ]
 
         vsepButton vIdx =
             let
@@ -2819,15 +3254,62 @@ viewTableEditor model =
 
     in
     div [ Attr.class "table-container" ]
-        [ if model.showImport then
-            div [ Attr.class "import-section" ]
+        [ table [ Attr.class "editor-table" ]
+            [ thead [] [ headerAlignmentRow, bodyAlignmentRow ]
+            , Html.Keyed.node "tbody" [] keyedBodyRows
+            ]
+        , div [ Attr.class "button-row" ]
+            [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
+                [ text "+ Row" ]
+            , button [ Attr.id "add-column", Attr.class "add-btn", onClick AddColumn ]
+                [ text "+ Column" ]
+            , button
+                [ Attr.id "undo-btn"
+                , Attr.class "add-btn"
+                , onClick Undo
+                , Attr.disabled (List.isEmpty model.undoStack)
+                ]
+                [ text "Undo" ]
+            ]
+        , div [ Attr.class "editor-subsections" ]
+            [ viewImportSubsection model
+            , viewSortSubsection model
+            , viewSummarySubsection model
+            ]
+        ]
+
+
+viewImportSubsection : Model -> Html FrontendMsg
+viewImportSubsection model =
+    div [ Attr.class "editor-subsection" ]
+        [ div [ Attr.class "subsection-header" ]
+            [ button
+                [ Attr.id "toggle-import"
+                , Attr.class "subsection-title"
+                , onClick ToggleImport
+                ]
+                [ span
+                    [ Attr.class
+                        (if model.showImport then
+                            "section-chevron"
+
+                         else
+                            "section-chevron collapsed"
+                        )
+                    ]
+                    [ text "▼" ]
+                , text "Import"
+                ]
+            ]
+        , if model.showImport then
+            div [ Attr.class "subsection-body" ]
                 [ textarea
                     [ Attr.id "import-textarea"
                     , Attr.class "import-textarea"
                     , Attr.placeholder "Paste from Excel, Google Sheets, or CSV..."
                     , Attr.value model.importText
                     , onInput ImportTextChanged
-                    , Attr.rows 6
+                    , Attr.rows 4
                     ]
                     []
                 , div [ Attr.class "import-actions" ]
@@ -2845,38 +3327,11 @@ viewTableEditor model =
 
           else
             text ""
-        , table [ Attr.class "editor-table" ]
-            [ thead [] [ headerAlignmentRow, bodyAlignmentRow ]
-            , Html.Keyed.node "tbody" [] keyedBodyRows
-            ]
-        , div [ Attr.class "button-row" ]
-            [ button [ Attr.id "add-row", Attr.class "add-btn", onClick AddRow ]
-                [ text "+ Row" ]
-            , button [ Attr.id "add-column", Attr.class "add-btn", onClick AddColumn ]
-                [ text "+ Column" ]
-            , button [ Attr.id "toggle-import", Attr.class "add-btn", onClick ToggleImport ]
-                [ text
-                    (if model.showImport then
-                        "Hide Import"
-
-                     else
-                        "Import Data"
-                    )
-                ]
-            , button
-                [ Attr.id "undo-btn"
-                , Attr.class "add-btn"
-                , onClick Undo
-                , Attr.disabled (List.isEmpty model.undoStack)
-                ]
-                [ text "Undo" ]
-            ]
-        , viewSortControls model
         ]
 
 
-viewSortControls : Model -> Html FrontendMsg
-viewSortControls model =
+viewSortSubsection : Model -> Html FrontendMsg
+viewSortSubsection model =
     let
         colRange =
             List.range 0 (model.cols - 1)
@@ -2909,10 +3364,15 @@ viewSortControls model =
                     []
 
                 SortedBy _ dir method ->
+                    let
+                        alreadySorted =
+                            sortedBodyRows model == List.range 1 (model.rows - 1)
+                    in
                     [ button
                         [ Attr.id "apply-sort-to-inputs"
                         , Attr.class "add-btn"
                         , onClick ApplySortToInputs
+                        , Attr.disabled alreadySorted
                         ]
                         [ text "Sort inputs to match outputs" ]
                     , fieldset []
@@ -3005,17 +3465,51 @@ viewSortControls model =
                         ]
                     ]
     in
-    div [ Attr.class "sort-controls" ]
-        (select
-            [ Attr.id "sort-column"
-            , Attr.value selectedCol
-            , onInput SetSortColumn
+    div [ Attr.class "editor-subsection" ]
+        [ div [ Attr.class "subsection-header" ]
+            [ span [ Attr.class "subsection-title" ] [ text "Sort" ] ]
+        , div [ Attr.class "subsection-body" ]
+            [ div [ Attr.class "sort-controls" ]
+                (select
+                    [ Attr.id "sort-column"
+                    , Attr.value selectedCol
+                    , onInput SetSortColumn
+                    ]
+                    (option [ Attr.value "" ] [ text "Sort\u{2026}" ]
+                        :: List.map columnOption colRange
+                    )
+                    :: sortOptions
+                )
             ]
-            (option [ Attr.value "" ] [ text "Sort\u{2026}" ]
-                :: List.map columnOption colRange
-            )
-            :: sortOptions
-        )
+        ]
+
+
+viewSummarySubsection : Model -> Html FrontendMsg
+viewSummarySubsection model =
+    let
+        isActive fn =
+            SeqSet.member fn model.summaryRows
+    in
+    div [ Attr.class "editor-subsection" ]
+        [ div [ Attr.class "subsection-header" ]
+            [ span [ Attr.class "subsection-title" ] [ text "Summary" ] ]
+        , div [ Attr.class "subsection-body" ]
+            [ div [ Attr.class "summary-controls" ]
+                [ button
+                    [ Attr.id "summary-max"
+                    , Attr.class
+                        (if isActive SummaryMax then
+                            "sort-pill active"
+
+                         else
+                            "sort-pill"
+                        )
+                    , onClick (ToggleSummaryRow SummaryMax)
+                    ]
+                    [ text "Max" ]
+                ]
+            ]
+        ]
 
 
 viewMarkdownOutput : Model -> Html FrontendMsg
@@ -3025,7 +3519,7 @@ viewMarkdownOutput model =
             SeqSet.member MarkdownSection model.collapsedSections
 
         markdown =
-            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments (sortedBodyRows model)
+            generateMarkdown model.outputFormat model.rows model.cols model.cells model.headerAlignments model.bodyAlignments (sortedBodyRows model) (SeqSet.toList model.summaryRows)
     in
     div [ Attr.class "output-section" ]
         (div
@@ -3172,6 +3666,39 @@ viewRenderedTable model =
                 )
                 (sortedBodyRows model)
 
+        summaryFunctions =
+            SeqSet.toList model.summaryRows
+
+        bodyRowIndicesForSummary =
+            List.range 1 (model.rows - 1)
+
+        previewTfoot =
+            if List.isEmpty summaryFunctions then
+                text ""
+
+            else
+                tfoot []
+                    (List.map
+                        (\fn ->
+                            let
+                                vals =
+                                    computeSummaryRow fn model.cols model.cells bodyRowIndicesForSummary
+                            in
+                            tr [ Attr.class "summary-row" ]
+                                (List.indexedMap
+                                    (\c v ->
+                                        if c == 0 then
+                                            th [ Attr.style "text-align" "left" ] [ text v ]
+
+                                        else
+                                            td [] [ text v ]
+                                    )
+                                    vals
+                                )
+                        )
+                        summaryFunctions
+                    )
+
         collapsed =
             SeqSet.member PreviewSection model.collapsedSections
     in
@@ -3207,6 +3734,7 @@ viewRenderedTable model =
                         [ table [ Attr.class "rendered-table" ]
                             [ thead [] [ headerRow ]
                             , Html.Keyed.node "tbody" [] keyedBodyRows
+                            , previewTfoot
                             ]
                         ]
                     ]
@@ -3221,7 +3749,7 @@ viewHtmlTableOutput model =
             SeqSet.member HtmlSection model.collapsedSections
 
         htmlTable =
-            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model)
+            generateHtmlTable model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model) (SeqSet.toList model.summaryRows)
     in
     div [ Attr.class "output-section" ]
         (div
@@ -3272,7 +3800,7 @@ viewBoxDrawingOutput model =
             SeqSet.member BoxDrawingSection model.collapsedSections
 
         boxDrawing =
-            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model)
+            generateBoxDrawing model.rows model.cols model.cells model.headerAlignments model.bodyAlignments model.horizontalLineStyles model.verticalLineStyles model.cellHorizontalStyles model.cellVerticalStyles (sortedBodyRows model) (SeqSet.toList model.summaryRows) model.summarySeparatorStyles
     in
     div [ Attr.class "output-section" ]
         (div

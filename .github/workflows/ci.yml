@@ -271,3 +271,38 @@ jobs:
                 body,
               });
             }
+
+  cleanup-preview:
+    needs: [deploy, e2e]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up SSH for Lamdera
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LAMDERA_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 apps.lamdera.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Add lamdera remote
+        run: git remote add lamdera git@apps.lamdera.com:tabular.git
+
+      - name: Delete merged branch from lamdera remote
+        run: |
+          git fetch lamdera
+          MAIN_SHA=$(git rev-parse HEAD)
+          for ref in $(git ls-remote --heads lamdera | awk '{print $2}'); do
+            BRANCH=${ref#refs/heads/}
+            if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+              continue
+            fi
+            BRANCH_SHA=$(git ls-remote lamdera "$ref" | awk '{print $1}')
+            if git merge-base --is-ancestor "$BRANCH_SHA" "$MAIN_SHA" 2>/dev/null; then
+              echo "Deleting merged branch: $BRANCH"
+              git push lamdera --delete "$BRANCH" || true
+            fi
+          done
