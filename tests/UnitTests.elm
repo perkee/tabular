@@ -1350,6 +1350,72 @@ computeSummaryRowTests =
                         computeSummaryRow SummaryMax 2 cells [ 1, 2 ]
                 in
                 Expect.equal [ "MAX", "3.14" ] result
+        , test "SummaryMin with numeric data" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "Bob" )
+                            , ( ( 2, 1 ), "20" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMin 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MIN", "10" ] result
+        , test "SummaryMin with mixed data" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "Bob" )
+                            , ( ( 2, 1 ), "N/A" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMin 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MIN", "5" ] result
+        , test "SummaryMin with all non-numeric" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Notes" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "good" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMin 2 cells [ 1 ]
+                in
+                Expect.equal [ "MIN", "" ] result
+        , test "SummaryMin with float values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "3.14" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "2.71" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMin 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MIN", "2.71" ] result
         ]
 
 
@@ -1388,6 +1454,23 @@ summaryInMarkdownTests =
                         generateMarkdown Compact 3 2 cells Dict.empty Dict.empty [ 1, 2 ] [ SummaryMax ]
                 in
                 Expect.equal True (String.contains "**MAX**" result && String.contains "**20**" result)
+        , test "MIN row appended with bold values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "20" )
+                            ]
+
+                    result =
+                        generateMarkdown Compact 3 2 cells Dict.empty Dict.empty [ 1, 2 ] [ SummaryMin ]
+                in
+                Expect.equal True (String.contains "**MIN**" result && String.contains "**10**" result)
         ]
 
 
@@ -1411,6 +1494,27 @@ summaryInHtmlTests =
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "<tfoot>" r)
                     , \r -> Expect.equal True (String.contains "<th scope=\"row\">MAX</th>" r)
+                    , \r -> Expect.equal True (String.contains "<td>10</td>" r)
+                    , \r -> Expect.equal True (String.contains "</tfoot>" r)
+                    ]
+                    result
+        , test "tfoot with MIN row" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            ]
+
+                    result =
+                        generateHtmlTable 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] [ SummaryMin ]
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "<tfoot>" r)
+                    , \r -> Expect.equal True (String.contains "<th scope=\"row\">MIN</th>" r)
                     , \r -> Expect.equal True (String.contains "<td>10</td>" r)
                     , \r -> Expect.equal True (String.contains "</tfoot>" r)
                     ]
@@ -1440,6 +1544,27 @@ summaryInBoxDrawingTests =
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "MAX" r)
                     , \r -> Expect.equal True (String.contains "9" r)
+                    ]
+                    result
+        , test "MIN row with thin separator before bottom border" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "N" )
+                            , ( ( 0, 1 ), "V" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "9" )
+                            ]
+
+                    result =
+                        generateBoxDrawing 3 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1, 2 ] [ SummaryMin ] Dict.empty
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "MIN" r)
+                    , \r -> Expect.equal True (String.contains "5" r)
                     ]
                     result
         ]
