@@ -1,12 +1,10 @@
 Merge the current branch's pull request into main.
 
-Steps:
-1. Find the PR number for the current branch using `gh pr view --json number -q .number`.
-2. Check that all CI checks have passed with `gh pr checks`.
-3. If checks are still running, wait with `gh pr checks <number> --watch` and print results.
-4. If all checks pass, squash-merge with `gh pr merge <number> --squash`.
-5. Switch back to main and pull: `git checkout main && git pull origin main`.
-6. Monitor the CI run on the merge commit using `gh run list --branch main --limit 1` to find the run, then `gh run watch <run-id>` and print the results.
-7. Print confirmation with the merged PR number and URL.
+Run `.claude/scripts/merge.sh $ARGUMENTS`.
 
-If $ARGUMENTS is provided, treat it as the PR number instead of looking it up from the current branch.
+If the script exits with code 2 (migration needed), it will have checked out the migration branch and printed file paths. Then:
+
+1. Read the three files printed by the script (MIGRATION_FILE, NEW_TYPES, OLD_TYPES).
+2. Fill in any `Unimplemented` placeholders in the migration based on the type differences.
+3. Run `npm run build` to verify the migration compiles.
+4. Run `.claude/scripts/merge-migration.sh` to commit, push, mark the PR ready, and watch CI.
