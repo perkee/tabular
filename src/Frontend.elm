@@ -107,6 +107,9 @@ summaryLabel fn =
         SummaryMax ->
             "MAX"
 
+        SummaryMin ->
+            "MIN"
+
 
 formatSummaryValue : Float -> String
 formatSummaryValue f =
@@ -142,6 +145,9 @@ computeSummaryRow fn cols cells bodyRowIndices =
                         case fn of
                             SummaryMax ->
                                 formatSummaryValue (List.foldl max (Maybe.withDefault 0 (List.head values)) values)
+
+                            SummaryMin ->
+                                formatSummaryValue (List.foldl min (Maybe.withDefault 0 (List.head values)) values)
     in
     List.map computeCol colRange
 
@@ -3507,6 +3513,18 @@ viewSummarySubsection model =
                     , onClick (ToggleSummaryRow SummaryMax)
                     ]
                     [ text "Max" ]
+                , button
+                    [ Attr.id "summary-min"
+                    , Attr.class
+                        (if isActive SummaryMin then
+                            "sort-pill active"
+
+                         else
+                            "sort-pill"
+                        )
+                    , onClick (ToggleSummaryRow SummaryMin)
+                    ]
+                    [ text "Min" ]
                 ]
             ]
         ]
