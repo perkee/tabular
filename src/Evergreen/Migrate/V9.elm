@@ -276,13 +276,6 @@ migrate_Types_SummaryFunction old =
         Evergreen.V7.Types.SummaryMax ->
             Evergreen.V9.Types.SummaryMax
 
-        notices ->
-            {- @NOTICE `SummaryMin` was added in V9.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            (Unimplemented {- New constructors were added. I need you to resolve the above notices and then remove this case. -})
-
 
 migrate_Types_TableSnapshot : Evergreen.V7.Types.TableSnapshot -> Evergreen.V9.Types.TableSnapshot
 migrate_Types_TableSnapshot old =
