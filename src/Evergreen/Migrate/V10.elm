@@ -279,21 +279,6 @@ migrate_Types_SummaryFunction old =
         Evergreen.V9.Types.SummaryMin ->
             Evergreen.V10.Types.SummaryMin
 
-        notices ->
-            {- @NOTICE `SummaryMean` was added in V10.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            {- @NOTICE `SummaryMedian` was added in V10.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            {- @NOTICE `SummaryMode` was added in V10.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            (Unimplemented {- New constructors were added. I need you to resolve the above notices and then remove this case. -})
-
 
 migrate_Types_TableSnapshot : Evergreen.V9.Types.TableSnapshot -> Evergreen.V10.Types.TableSnapshot
 migrate_Types_TableSnapshot old =
