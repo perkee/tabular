@@ -110,6 +110,15 @@ summaryLabel fn =
         SummaryMin ->
             "MIN"
 
+        SummaryMean ->
+            "MEAN"
+
+        SummaryMedian ->
+            "MEDIAN"
+
+        SummaryMode ->
+            "MODE"
+
 
 formatSummaryValue : Float -> String
 formatSummaryValue f =
@@ -148,6 +157,69 @@ computeSummaryRow fn cols cells bodyRowIndices =
 
                             SummaryMin ->
                                 formatSummaryValue (List.foldl min (Maybe.withDefault 0 (List.head values)) values)
+
+                            SummaryMean ->
+                                formatSummaryValue (List.sum values / toFloat (List.length values))
+
+                            SummaryMedian ->
+                                let
+                                    sorted =
+                                        List.sort values
+
+                                    len =
+                                        List.length sorted
+
+                                    mid =
+                                        len // 2
+                                in
+                                if remainderBy 2 len == 1 then
+                                    formatSummaryValue (Maybe.withDefault 0 (List.head (List.drop mid sorted)))
+
+                                else
+                                    let
+                                        lower =
+                                            Maybe.withDefault 0 (List.head (List.drop (mid - 1) sorted))
+
+                                        upper =
+                                            Maybe.withDefault 0 (List.head (List.drop mid sorted))
+                                    in
+                                    formatSummaryValue ((lower + upper) / 2)
+
+                            SummaryMode ->
+                                let
+                                    freqs =
+                                        List.foldl
+                                            (\v acc ->
+                                                Dict.update (formatSummaryValue v)
+                                                    (\existing ->
+                                                        case existing of
+                                                            Just count ->
+                                                                Just (count + 1)
+
+                                                            Nothing ->
+                                                                Just 1
+                                                    )
+                                                    acc
+                                            )
+                                            Dict.empty
+                                            values
+
+                                    maxFreq =
+                                        Dict.foldl (\_ count best -> max count best) 0 freqs
+
+                                    modes =
+                                        Dict.foldl
+                                            (\val count acc ->
+                                                if count == maxFreq then
+                                                    acc ++ [ val ]
+
+                                                else
+                                                    acc
+                                            )
+                                            []
+                                            freqs
+                                in
+                                String.join ", " modes
     in
     List.map computeCol colRange
 
@@ -1793,13 +1865,54 @@ generateBoxDrawing rows cols cells headerAlignments bodyAlignments hStyles vStyl
                 in
                 leftC ++ String.concat (interleave segments innerIntersections) ++ rightC
 
+            summaryTopLine =
+                let
+                    segments =
+                        List.map2
+                            (\c w -> String.repeat (w + 2) (horizontalChar (effH rows c)))
+                            colRange
+                            colWidths
+
+                    innerIntersections =
+                        List.map
+                            (\vIdx ->
+                                let
+                                    up =
+                                        lineStyleWeight (effV (rows - 1) vIdx)
+
+                                    hLeft =
+                                        lineStyleWeight (effH rows (vIdx - 1))
+
+                                    hRight =
+                                        lineStyleWeight (effH rows vIdx)
+                                in
+                                lookupCorner up WLight hLeft hRight
+                            )
+                            (List.range 1 (cols - 1))
+
+                    leftC =
+                        lookupCorner
+                            (lineStyleWeight (effV (rows - 1) 0))
+                            WLight
+                            WNone
+                            (lineStyleWeight (effH rows 0))
+
+                    rightC =
+                        lookupCorner
+                            (lineStyleWeight (effV (rows - 1) cols))
+                            WLight
+                            (lineStyleWeight (effH rows (cols - 1)))
+                            WNone
+                in
+                leftC ++ String.concat (interleave segments innerIntersections) ++ rightC
+
             summarySection =
                 case summaryRowValues of
                     [] ->
                         []
 
                     first :: rest ->
-                        horizontalLine rows
+                        summaryTopLine
                             :: formatSummaryRowBox first
                             :: List.concat (List.indexedMap (\i vals -> [ summarySepLine i, formatSummaryRowBox vals ]) rest)
 
@@ -3525,6 +3638,42 @@ viewSummarySubsection model =
                     , onClick (ToggleSummaryRow SummaryMin)
                     ]
                     [ text "Min" ]
+                , button
+                    [ Attr.id "summary-mean"
+                    , Attr.class
+                        (if isActive SummaryMean then
+                            "sort-pill active"
+
+                         else
+                            "sort-pill"
+                        )
+                    , onClick (ToggleSummaryRow SummaryMean)
+                    ]
+                    [ text "Mean" ]
+                , button
+                    [ Attr.id "summary-median"
+                    , Attr.class
+                        (if isActive SummaryMedian then
+                            "sort-pill active"
+
+                         else
+                            "sort-pill"
+                        )
+                    , onClick (ToggleSummaryRow SummaryMedian)
+                    ]
+                    [ text "Median" ]
+                , button
+                    [ Attr.id "summary-mode"
+                    , Attr.class
+                        (if isActive SummaryMode then
+                            "sort-pill active"
+
+                         else
+                            "sort-pill"
+                        )
+                    , onClick (ToggleSummaryRow SummaryMode)
+                    ]
+                    [ text "Mode" ]
                 ]
             ]
         ]
