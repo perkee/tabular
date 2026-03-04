@@ -98,6 +98,9 @@ type SortState
 type SummaryFunction
     = SummaryMax
     | SummaryMin
+    | SummaryMean
+    | SummaryMedian
+    | SummaryMode
 
 
 type alias BackendModel =

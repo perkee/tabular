@@ -1416,6 +1416,244 @@ computeSummaryRowTests =
                         computeSummaryRow SummaryMin 2 cells [ 1, 2 ]
                 in
                 Expect.equal [ "MIN", "2.71" ] result
+        , test "SummaryMean with numeric data" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "Bob" )
+                            , ( ( 2, 1 ), "20" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMean 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MEAN", "15" ] result
+        , test "SummaryMean with mixed data" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "Bob" )
+                            , ( ( 2, 1 ), "N/A" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMean 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MEAN", "5" ] result
+        , test "SummaryMean with all non-numeric" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Notes" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "good" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMean 2 cells [ 1 ]
+                in
+                Expect.equal [ "MEAN", "" ] result
+        , test "SummaryMean with float values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "3.0" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "2.0" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMean 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MEAN", "2.5" ] result
+        , test "SummaryMedian with odd count" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "20" )
+                            , ( ( 3, 0 ), "C" )
+                            , ( ( 3, 1 ), "30" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMedian 2 cells [ 1, 2, 3 ]
+                in
+                Expect.equal [ "MEDIAN", "20" ] result
+        , test "SummaryMedian with even count averages middle two" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "20" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMedian 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MEDIAN", "15" ] result
+        , test "SummaryMedian with mixed data" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "Bob" )
+                            , ( ( 2, 1 ), "N/A" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMedian 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MEDIAN", "5" ] result
+        , test "SummaryMedian with all non-numeric" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Notes" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "good" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMedian 2 cells [ 1 ]
+                in
+                Expect.equal [ "MEDIAN", "" ] result
+        , test "SummaryMedian with float values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "1.0" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "3.0" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMedian 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MEDIAN", "2" ] result
+        , test "SummaryMode single mode" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "10" )
+                            , ( ( 3, 0 ), "C" )
+                            , ( ( 3, 1 ), "20" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMode 2 cells [ 1, 2, 3 ]
+                in
+                Expect.equal [ "MODE", "10" ] result
+        , test "SummaryMode multiple modes tied" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "2" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "3" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMode 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MODE", "2, 3" ] result
+        , test "SummaryMode all unique shows all" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Score" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "1" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "2" )
+                            , ( ( 3, 0 ), "C" )
+                            , ( ( 3, 1 ), "3" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMode 2 cells [ 1, 2, 3 ]
+                in
+                Expect.equal [ "MODE", "1, 2, 3" ] result
+        , test "SummaryMode with mixed data" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Value" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "Bob" )
+                            , ( ( 2, 1 ), "N/A" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMode 2 cells [ 1, 2 ]
+                in
+                Expect.equal [ "MODE", "5" ] result
+        , test "SummaryMode with all non-numeric" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Notes" )
+                            , ( ( 1, 0 ), "Alice" )
+                            , ( ( 1, 1 ), "good" )
+                            ]
+
+                    result =
+                        computeSummaryRow SummaryMode 2 cells [ 1 ]
+                in
+                Expect.equal [ "MODE", "" ] result
         ]
 
 
@@ -1471,6 +1709,57 @@ summaryInMarkdownTests =
                         generateMarkdown Compact 3 2 cells Dict.empty Dict.empty [ 1, 2 ] [ SummaryMin ]
                 in
                 Expect.equal True (String.contains "**MIN**" result && String.contains "**10**" result)
+        , test "MEAN row appended with bold values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "20" )
+                            ]
+
+                    result =
+                        generateMarkdown Compact 3 2 cells Dict.empty Dict.empty [ 1, 2 ] [ SummaryMean ]
+                in
+                Expect.equal True (String.contains "**MEAN**" result && String.contains "**15**" result)
+        , test "MEDIAN row appended with bold values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "20" )
+                            ]
+
+                    result =
+                        generateMarkdown Compact 3 2 cells Dict.empty Dict.empty [ 1, 2 ] [ SummaryMedian ]
+                in
+                Expect.equal True (String.contains "**MEDIAN**" result && String.contains "**15**" result)
+        , test "MODE row appended with bold values" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "10" )
+                            ]
+
+                    result =
+                        generateMarkdown Compact 3 2 cells Dict.empty Dict.empty [ 1, 2 ] [ SummaryMode ]
+                in
+                Expect.equal True (String.contains "**MODE**" result && String.contains "**10**" result)
         ]
 
 
@@ -1515,6 +1804,69 @@ summaryInHtmlTests =
                 Expect.all
                     [ \r -> Expect.equal True (String.contains "<tfoot>" r)
                     , \r -> Expect.equal True (String.contains "<th scope=\"row\">MIN</th>" r)
+                    , \r -> Expect.equal True (String.contains "<td>10</td>" r)
+                    , \r -> Expect.equal True (String.contains "</tfoot>" r)
+                    ]
+                    result
+        , test "tfoot with MEAN row" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            ]
+
+                    result =
+                        generateHtmlTable 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] [ SummaryMean ]
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "<tfoot>" r)
+                    , \r -> Expect.equal True (String.contains "<th scope=\"row\">MEAN</th>" r)
+                    , \r -> Expect.equal True (String.contains "<td>10</td>" r)
+                    , \r -> Expect.equal True (String.contains "</tfoot>" r)
+                    ]
+                    result
+        , test "tfoot with MEDIAN row" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            ]
+
+                    result =
+                        generateHtmlTable 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] [ SummaryMedian ]
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "<tfoot>" r)
+                    , \r -> Expect.equal True (String.contains "<th scope=\"row\">MEDIAN</th>" r)
+                    , \r -> Expect.equal True (String.contains "<td>10</td>" r)
+                    , \r -> Expect.equal True (String.contains "</tfoot>" r)
+                    ]
+                    result
+        , test "tfoot with MODE row" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "Name" )
+                            , ( ( 0, 1 ), "Val" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "10" )
+                            ]
+
+                    result =
+                        generateHtmlTable 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] [ SummaryMode ]
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "<tfoot>" r)
+                    , \r -> Expect.equal True (String.contains "<th scope=\"row\">MODE</th>" r)
                     , \r -> Expect.equal True (String.contains "<td>10</td>" r)
                     , \r -> Expect.equal True (String.contains "</tfoot>" r)
                     ]
@@ -1567,4 +1919,113 @@ summaryInBoxDrawingTests =
                     , \r -> Expect.equal True (String.contains "5" r)
                     ]
                     result
+        , test "MEAN row in box drawing" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "N" )
+                            , ( ( 0, 1 ), "V" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "9" )
+                            ]
+
+                    result =
+                        generateBoxDrawing 3 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1, 2 ] [ SummaryMean ] Dict.empty
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "MEAN" r)
+                    , \r -> Expect.equal True (String.contains "7" r)
+                    ]
+                    result
+        , test "MEDIAN row in box drawing" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "N" )
+                            , ( ( 0, 1 ), "V" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "9" )
+                            ]
+
+                    result =
+                        generateBoxDrawing 3 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1, 2 ] [ SummaryMedian ] Dict.empty
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "MEDIAN" r)
+                    , \r -> Expect.equal True (String.contains "7" r)
+                    ]
+                    result
+        , test "MODE row in box drawing" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "N" )
+                            , ( ( 0, 1 ), "V" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "5" )
+                            , ( ( 2, 0 ), "B" )
+                            , ( ( 2, 1 ), "5" )
+                            ]
+
+                    result =
+                        generateBoxDrawing 3 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1, 2 ] [ SummaryMode ] Dict.empty
+                in
+                Expect.all
+                    [ \r -> Expect.equal True (String.contains "MODE" r)
+                    , \r -> Expect.equal True (String.contains "5" r)
+                    ]
+                    result
+        , test "separator between body and summary uses T-junctions not bottom corners" <|
+            \_ ->
+                let
+                    cells =
+                        Dict.fromList
+                            [ ( ( 0, 0 ), "N" )
+                            , ( ( 0, 1 ), "V" )
+                            , ( ( 1, 0 ), "A" )
+                            , ( ( 1, 1 ), "5" )
+                            ]
+
+                    result =
+                        generateBoxDrawing 2 2 cells Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty Dict.empty [ 1 ] [ SummaryMax ] Dict.empty
+
+                    lines =
+                        String.lines result
+
+                    -- The separator before MAX should have ├ and ┤ (T-junctions), not └ and ┘
+                    separatorBeforeMax =
+                        lines
+                            |> List.indexedMap Tuple.pair
+                            |> List.filterMap
+                                (\( i, _ ) ->
+                                    if i + 1 < List.length lines then
+                                        case List.head (List.drop (i + 1) lines) of
+                                            Just nextLine ->
+                                                if String.contains "MAX" nextLine then
+                                                    List.head (List.drop i lines)
+
+                                                else
+                                                    Nothing
+
+                                            Nothing ->
+                                                Nothing
+
+                                    else
+                                        Nothing
+                                )
+                            |> List.head
+                            |> Maybe.withDefault ""
+                in
+                Expect.all
+                    [ \s -> Expect.equal True (String.contains "├" s)
+                    , \s -> Expect.equal True (String.contains "┤" s)
+                    ]
+                    separatorBeforeMax
         ]
